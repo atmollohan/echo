@@ -1,0 +1,9 @@
+.git
+.gitignore
+.planning
+__pycache__
+*.pyc
+.venv
+venv
+.env
+*.egg-info

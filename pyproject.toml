@@ -1,0 +1,26 @@
+[project]
+name = "echo-lab-protocol"
+version = "0.1.0"
+description = "A user-friendly tool for generating Beckman Echo liquid handler protocols"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit>=1.28.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+    "tqdm>=4.65.0",
+    "papermill>=2.5.0",
+    "jupyter>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.streamlit]
+server.port = 8501
+server.address = "0.0.0.0"
+
+[project.scripts]
+echo-run = "echo_run.cli:main"

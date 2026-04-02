@@ -5,6 +5,15 @@
 
 ## v1 Requirements
 
+### Docker Support
+
+- [ ] **DOCKER-01**: Project includes Dockerfile to build container image
+- [ ] **DOCKER-02**: Container can be run via `docker run` with config mount
+- [ ] **DOCKER-03**: CLI accepts `--config` as mount path or environment variable
+- [ ] **DOCKER-04**: Output directory mountable via `-v` flag
+- [ ] **DOCKER-05**: Docker image published to registry (Docker Hub or GHCR)
+- [ ] **DOCKER-06**: README includes both local and docker run instructions
+
 ### CLI Interface
 
 - [ ] **CLI-01**: User can run protocol generator via `echo-run` command
@@ -15,23 +24,30 @@
 
 ### Configuration Management
 
-- [ ] **CFG-01**: User can define experiment parameters in YAML config file
-- [ ] **CFG-02**: Config supports dose concentrations (array of values)
-- [ ] **CFG-03**: Config supports sample/variant list (names and metadata)
-- [ ] **CFG-04**: Config supports volume specifications (in nL)
-- [ ] **CFG-05**: Config supports reagent definitions with source well positions
-- [ ] **CFG-06**: CLI validates config on load with clear error messages
-- [ ] **CFG-07**: Example config file provided as template
+- [ ] **CFG-01**: User can define experiment parameters in simple text config file
+- [ ] **CFG-02**: Config format is key=value pairs (INI style) — easy to edit manually
+- [ ] **CFG-03**: Config supports dose concentrations (comma-separated values)
+- [ ] **CFG-04**: Config supports sample/variant list (one per line)
+- [ ] **CFG-05**: Config supports volume specifications (in nL or µL)
+- [ ] **CFG-06**: Config supports reagent definitions with source well positions
+- [ ] **CFG-07**: CLI validates config on load with clear error messages
+- [ ] **CFG-08**: Example config file provided as template
+
+### CSV Data Input
+
+- [ ] **DATA-01**: CLI reads experiment data from CSV files
+- [ ] **DATA-02**: CSV data files contain sample names and metadata
+- [ ] **DATA-03**: CSV data files can reference sample files in subdirectories
 
 ### Dependency Management
 
-- [ ] **DEP-01**: Project uses uv for dependency management (or venv fallback)
+- [ ] **DEP-01**: Project uses uv for dependency management (or pip/venv fallback)
 - [ ] **DEP-02**: `pyproject.toml` defines all dependencies with version pins
 - [ ] **DEP-03**: CLI checks that all required packages are installed before running
 - [ ] **DEP-04**: CLI provides `install` subcommand to install dependencies
-- [ ] **DEP-05**: CLI provides `sync` subcommand to sync dependencies from pyproject.toml
-- [ ] **DEP-06**: Dependency conflicts produce clear error messages
-- [ ] **DEP-07**: CLI detects and reports missing Python version requirements
+- [ ] **DEP-05**: Dependencies resolved via `uv sync` or `pip install -e .`
+- [ ] **DEP-06**: CLI detects and reports missing Python version requirements
+- [ ] **DEP-07**: Project works on macOS, Linux, and Windows (WSL compatible)
 
 ### Notebook Execution
 
@@ -97,13 +113,55 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLI-01 through CLI-06 | Phase 1 | Pending |
-| CFG-01 through CFG-07 | Phase 1 | Pending |
-| DEP-01 through DEP-07 | Phase 1 | Pending |
-| NB-01 through NB-06 | Phase 1 | Pending |
-| PROT-01 through PROT-05 | Phase 1 | Pending |
-| VAL-01 through VAL-05 | Phase 2 | Pending |
-| OUT-01 through OUT-04 | Phase 1 | Pending |
+| CLI-01 | Phase 1 | Pending |
+| CLI-02 | Phase 1 | Pending |
+| CLI-03 | Phase 1 | Pending |
+| CLI-04 | Phase 1 | Pending |
+| CLI-05 | Phase 1 | Pending |
+| CFG-01 | Phase 1 | Pending |
+| CFG-02 | Phase 1 | Pending |
+| CFG-03 | Phase 1 | Pending |
+| CFG-04 | Phase 1 | Pending |
+| CFG-05 | Phase 1 | Pending |
+| CFG-06 | Phase 1 | Pending |
+| CFG-07 | Phase 1 | Pending |
+| DEP-01 | Phase 1 | Pending |
+| DEP-02 | Phase 1 | Pending |
+| DEP-03 | Phase 1 | Pending |
+| DEP-04 | Phase 1 | Pending |
+| DEP-05 | Phase 1 | Pending |
+| DEP-06 | Phase 1 | Pending |
+| DEP-07 | Phase 1 | Pending |
+| NB-01 | Phase 2 | Pending |
+| NB-02 | Phase 2 | Pending |
+| NB-03 | Phase 2 | Pending |
+| NB-04 | Phase 2 | Pending |
+| NB-05 | Phase 2 | Pending |
+| NB-06 | Phase 2 | Pending |
+| PROT-01 | Phase 2 | Pending |
+| PROT-02 | Phase 2 | Pending |
+| PROT-03 | Phase 2 | Pending |
+| PROT-04 | Phase 2 | Pending |
+| PROT-05 | Phase 2 | Pending |
+| VAL-01 | Phase 3 | Pending |
+| VAL-02 | Phase 3 | Pending |
+| VAL-03 | Phase 3 | Pending |
+| VAL-04 | Phase 3 | Pending |
+| VAL-05 | Phase 3 | Pending |
+| OUT-01 | Phase 2 | Pending |
+| OUT-02 | Phase 2 | Pending |
+| OUT-03 | Phase 2 | Pending |
+| OUT-04 | Phase 2 | Pending |
+| DOCKER-01 | Phase 1 | Pending |
+| DOCKER-02 | Phase 1 | Pending |
+| DOCKER-03 | Phase 1 | Pending |
+| DOCKER-04 | Phase 1 | Pending |
+| DOCKER-05 | Phase 1 | Pending |
+| DOCKER-06 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Pending |
+| DATA-03 | Phase 1 | Pending |
+| CFG-08 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total

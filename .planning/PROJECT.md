@@ -2,11 +2,17 @@
 
 ## What This Is
 
-A Jupyter notebook-based lab protocol generator for Beckman Echo liquid handler. It generates CSV transfer protocols for automated liquid handling in 384-well and 96-well plate formats based on experiment parameters (dose concentrations, sample variants, volumes).
+A user-friendly Python-based tool for running Jupyter notebooks that generate Beckman Echo liquid handler protocols. Designed for lab scientists who aren't coders — provides a clean interface to configure experiments, run notebooks, and export CSV protocols without touching notebook code.
 
 ## Core Value
 
-Scientists can define experiment parameters in notebooks and generate validated liquid handler transfer protocols without manual spreadsheet work.
+A non-coder lab scientist can:
+1. Clone the repo (or pull the Docker image)
+2. Edit a simple config file with experiment parameters
+3. Run `docker run` (or `./echo-run` locally)
+4. Get validated CSV output for the Echo liquid handler
+
+No Python coding, no notebook editing, no complex setup required.
 
 ## Requirements
 
@@ -24,9 +30,11 @@ Scientists can define experiment parameters in notebooks and generate validated 
 
 ### Out of Scope
 
-- Python module refactoring — notebooks sufficient for now
-- Web interface — notebook execution meets current needs
+- Full Python module refactoring — notebooks sufficient, but extract shared utilities
+- Web interface — CLI meets current needs
 - Real-time instrument integration — CSV export sufficient
+- Inventory management — separate product category (LIMS/ELN)
+- 1536-well plate support — not supported by Echo 525
 
 ## Context
 
@@ -34,17 +42,20 @@ Scientists can define experiment parameters in notebooks and generate validated 
 - 6 Jupyter notebooks in `notebooks/` directory
 - Raw CSV data in `data/raw/`
 - No Python modules — all logic embedded in notebooks
+- Notebooks require editing to change experiment parameters
 
-**Key architecture patterns:**
-- Plate maps using Pandas DataFrames (rows A-P, columns 1-24)
-- Flat lists of 384 elements for well tracking
-- Direct list/array manipulation for dose-response mapping
+**Target user:**
+- Lab scientist (not a coder)
+- Works with Python/Jupyter for lab work
+- Needs to quickly configure and run experiments
+- Wants portability — easy to share with colleagues
 
 **Known concerns from mapping:**
-- Hardcoded parameters (not configurable via external config)
+- Hardcoded parameters (edit notebook cells to change)
 - Duplicate logic between plate files
 - No automated testing
 - No version control for protocols
+- Scientists must edit notebook code to configure experiments
 
 ## Constraints
 

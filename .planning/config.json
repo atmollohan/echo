@@ -10,5 +10,10 @@
     "verifier": true,
     "nyquist_validation": true,
     "auto_advance": false
+  },
+  "planning": {
+    "description": "Dockerized lab protocol generator with CSV data input",
+    "total_phases": 3,
+    "total_requirements": 32
   }
 }

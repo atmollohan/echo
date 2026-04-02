@@ -1,151 +1,142 @@
-<!-- GSD:project-start source:PROJECT.md -->
-## Project
+# Echo Lab Protocol Generator
 
-**Echo Lab Protocol Generator**
+## Project Overview
 
-A user-friendly Python-based tool for running Jupyter notebooks that generate Beckman Echo liquid handler protocols. Designed for lab scientists who aren't coders — provides a clean interface to configure experiments, run notebooks, and export CSV protocols without touching notebook code.
+**Echo Lab Protocol Generator** - A user-friendly web application for generating Beckman Echo liquid handler protocols.
 
 **Core Value:** A non-coder lab scientist can:
 1. Clone the repo (or pull the Docker image)
-2. Edit a simple config file with experiment parameters
-3. Run `docker run` (or `./echo-run` locally)
-4. Get validated CSV output for the Echo liquid handler
+2. Open the web interface in a browser
+3. Configure experiment parameters via form or config file
+4. Click "Generate Protocol" and download validated CSV output
 
 No Python coding, no notebook editing, no complex setup required.
 
 ### Constraints
 
-- **Platform**: Python 3, Jupyter notebooks
+- **Platform**: Python 3, Streamlit web UI, Jupyter notebooks
 - **Output**: CSV files compatible with Beckman Echo liquid handler
 - **Format**: 384-well source plates, 96-well destination plates
-<!-- GSD:project-end -->
 
-<!-- GSD:stack-start source:codebase/STACK.md -->
+---
+
 ## Technology Stack
 
-## Languages
-- Python 3 - Data analysis, notebook execution, plate map generation
-- Jupyter - Interactive notebooks for experiment analysis
-## Runtime
-- Python 3 virtual environment (`.venv/`)
-- Package Manager: pip (via requirements.txt)
-- matplotlib - Data visualization
-- notebook - Jupyter notebooks
-- numpy - Numerical computing
+### Languages
+- Python 3 - Core application logic
+- Jupyter - Protocol generation notebooks
+
+### Dependencies
+- streamlit - Web UI framework
 - pandas - Data manipulation/CSV processing
+- numpy - Numerical operations for dose calculations
+- matplotlib - Plate heatmaps, visualization
+- papermill - Notebook execution
 - tqdm - Progress bars
-## Frameworks
-- Pandas - CSV reading/writing for lab equipment protocols
-- NumPy - Numerical operations for dose calculations
-- Matplotlib - Plate heatmaps, dose-response curves
-## Configuration
-- Virtual environment setup via makefile
-- No environment variables used
-- `makefile` - Automates venv creation and dependency installation
-- `requirements.txt` - Python dependencies
-- Jupyter notebooks (`.ipynb`) for all analysis code
-## Platform Requirements
-- Python 3
-- Virtual environment (created via makefile)
-- Not applicable - local analysis only
-<!-- GSD:stack-end -->
 
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
-## Conventions
+### Runtime
+- Python 3.11+
+- Docker (for containerized deployment)
+- uv or pip for dependency management
 
-## Naming Patterns
-- Lowercase with hyphens: `library-PLATE-A.ipynb`, `2-ANTIGEN-2-MM-EXPRESSION.ipynb`
-- Checkpoint files: `*-checkpoint.ipynb`
-- Lowercase with underscores: `source_sample_names`, `dest_antigen_vol`, `plate_columns`
-- Descriptive: `vol_cellextract`, `amnt_antigen_to_add`
-- Simple descriptive names: `make_plate()` - defined inline in notebooks
-## Code Style
-- Python standard (PEP 8 implicit)
-- No enforced formatting tools detected
-- None detected
-- Sequential cell execution
-- Import cells at top
-- Configuration cells before logic cells
-## Import Organization
-## Error Handling
-- Print statements for verification
-- No try/except blocks detected
-- Minimal error handling - relies on sequential execution
-- Print statements: `print(variants)`, `print(num_samples)`, `print(dest_antigen_vol)`
-- Checkpoint saves for recovery
-## Comments
-- Inline comments for complex calculations
-- Section headers via Markdown cells
-- Example: `"Note: units for ALL volumes is nL"`
-- No formal docstrings (Jupyter cells instead)
-- No type hints detected
-## Function Design
-- Simple helper functions defined inline
-- Example: `make_plate()` creates empty DataFrame
-- Not applicable - logic in notebook cells, not modular functions
-## Module Design
-<!-- GSD:conventions-end -->
+---
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
 ## Architecture
 
-## Pattern Overview
-- Notebooks contain all logic - no separate Python modules
-- Direct manipulation of lists/arrays for plate operations
-- CSV generation for Beckman Echo liquid handler protocols
-- Experiment parameter configuration via notebook cells
-## Layers
-- Purpose: Define experiment parameters
-- Location: `notebooks/` (cells near top of each notebook)
-- Contains: Dose concentrations, volumes, variant lists
-- Example parameters: `doses = 6`, `highest_dose = 4` (uM), `vol_cellextract = 2000` (nL)
-- Purpose: Represent 384-well and 96-well plate layouts
-- Location: `notebooks/library-PLATE-*.ipynb`
-- Contains: List-based well tracking, dose-response mapping
-- Pattern: Flat lists of 384 elements indexed by well position
-- Purpose: Create liquid handler transfer instructions
-- Location: `notebooks/library-PLATE-*.ipynb` (later cells)
-- Contains: Source/destination well mapping, volume calculations
-- Output: CSV files for Echo liquid handler
-## Data Flow
-- `wells` - List of 384 well identifiers (A1-P24)
-- `wells96` - List of 96 well identifiers (A1-H12)
-- `source_sample_names` - 384-length list of sample IDs
-- `source_sample_vol` - 384-length list of volumes (nL)
-- `dest_*_vol` - Destination well volumes for each reagent
-## Key Abstractions
-- Purpose: Represent 384-well plate layout
-- Examples: `source_plate_df` in notebooks
-- Pattern: Pandas DataFrame with rows A-P, columns 1-24
-- Purpose: Map variant → dose point → well
-- Pattern: Nested loops generating flat lists
-## Entry Points
-- Location: `notebooks/library-PLATE-A.ipynb`, `notebooks/library-PLATE-B.ipynb`
-- Triggers: Manual execution in Jupyter
-- Responsibilities: All experiment setup through protocol output
-## Error Handling
-- Print statements for verification (`print(variants)`, `print(num_samples)`)
-- Checkpoint notebooks saved as backups (`*-checkpoint.ipynb`)
-<!-- GSD:architecture-end -->
+### Pattern Overview
+- Streamlit web UI as primary interface
+- Jupyter notebooks contain protocol generation logic
+- CSV configuration files for experiment parameters
+- Docker for portable deployment
 
-<!-- GSD:workflow-start source:GSD defaults -->
-## GSD Workflow Enforcement
+### Layers
+1. **Web UI Layer** (app.py)
+   - Config file upload
+   - Form-based parameter entry
+   - Notebook selector
+   - Output display with download
 
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+2. **Configuration Layer**
+   - INI format config files
+   - Experiment parameters (doses, volumes, samples)
+   - Notebook selection
 
-Use these entry points:
-- `/gsd:quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd:debug` for investigation and bug fixing
-- `/gsd:execute-phase` for planned phase work
+3. **Protocol Generation Layer** (notebooks/)
+   - 384-well plate layout generation
+   - 96-well destination plate layouts
+   - Dose-response matrix mapping
+   - CSV protocol output
 
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
+### Data Flow
+- User inputs experiment parameters via UI
+- Parameters passed to selected notebook
+- Notebook generates CSV protocol
+- CSV displayed in UI with download option
 
+---
 
+## Project Structure
 
-<!-- GSD:profile-start -->
-## Developer Profile
+```
+.
+├── app.py                    # Streamlit web UI
+├── pyproject.toml            # Project dependencies
+├── config.example.ini        # Example configuration
+├── Dockerfile                # Docker container
+├── README.md                 # Usage instructions
+├── notebooks/                # Protocol generation notebooks
+│   ├── library-PLATE-A.ipynb
+│   └── library-PLATE-B.ipynb
+└── data/                     # Sample data
+    └── raw/
+```
 
-> Profile not yet configured. Run `/gsd:profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
+---
+
+## Getting Started
+
+### Local Development
+```bash
+# Install dependencies
+pip install -e .
+
+# Run web UI
+streamlit run app.py
+```
+
+### Docker
+```bash
+# Build
+docker build -t echo-run .
+
+# Run
+docker run -p 8501:8501 echo-run
+```
+
+Then open http://localhost:8501 in your browser.
+
+---
+
+## Configuration
+
+Edit `config.example.ini` or use the web form:
+
+```ini
+experiment_name = my_experiment
+doses = 6
+doses2 = 3
+highest_dose = 4
+vol_cellextract = 2000
+vol_antigen = 2000
+samples = sample1,sample2,sample3
+notebook = library-PLATE-A.ipynb
+```
+
+---
+
+## Notes
+
+- Units for all volumes are in nanoliters (nL)
+- Notebooks require hardcoded parameters currently (v1)
+- Output format: Beckman Echo CSV (Source Well, Dest Well, Transfer Volume)
+- Validation layer coming in future phase

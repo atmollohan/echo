@@ -6,7 +6,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Docker & CLI Foundation** — Dockerfile, CLI entry point, config file format
+- [ ] **Phase 1: Web UI & Docker Foundation** — Streamlit app, Dockerfile, config loading
 - [ ] **Phase 2: Notebook Execution & Output** — Run notebooks, generate protocols, manage output
 - [ ] **Phase 3: Protocol Validation** — Validate CSV output, well formats, volumes
 
@@ -14,29 +14,30 @@
 
 ## Phase Details
 
-### Phase 1: Docker & CLI Foundation
+### Phase 1: Web UI & Docker Foundation
 
-**Goal:** User can clone the repo or pull Docker image and run with a simple config file
+**Goal:** User can open web interface in browser and generate protocols
 
 **Depends on:** Nothing (first phase)
 
-**Requirements:** DOCKER-01, DOCKER-02, DOCKER-03, DOCKER-04, DOCKER-05, DOCKER-06, CLI-01, CLI-02, CLI-03, CLI-04, CLI-05, CFG-01, CFG-02, CFG-03, CFG-04, CFG-05, CFG-06, CFG-07, CFG-08, DATA-01, DATA-02, DATA-03, DEP-01, DEP-02, DEP-03, DEP-04, DEP-05, DEP-06, DEP-07
+**Requirements:** UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-09, UI-10, DOCKER-01, DOCKER-02, DOCKER-03, DOCKER-04, DOCKER-05, DOCKER-06, CFG-01, CFG-02, CFG-03, CFG-04, CFG-05, CFG-06, CFG-07, CFG-08, DATA-01, DATA-02, DATA-03
 
 **Success Criteria** (what must be TRUE):
-1. `Dockerfile` exists and builds successfully
-2. `docker build -t echo-run .` produces working image
-3. `docker run -v /path/to/config:/config echo-run --help` shows usage
-4. `docker run -v /path/to/config:/config -v /path/to/output:/output echo-run --config /config/experiment.ini` runs without errors
-5. Config file format is simple key=value pairs (INI style)
-6. Example config file `config.example.ini` exists and is valid
-7. CLI displays clear success or failure messages with exit codes
-8. README includes both local and docker run instructions
-9. `pyproject.toml` exists with all dependencies pinned
-10. Project works on macOS, Linux, and Windows (WSL compatible)
+1. `streamlit run app.py` opens web interface in browser
+2. User can upload or select config file via file picker
+3. User can view/edit experiment parameters in form fields
+4. User can select which notebook to run
+5. UI shows progress during notebook execution
+6. UI displays generated CSV output with download button
+7. UI shows validation errors clearly with suggestions
+8. `Dockerfile` exists and builds with Streamlit
+9. `docker run -p 8501:8501 echo-run` opens web UI
+10. README includes both local and docker run instructions
+11. Example config file exists and is valid
 
 **Plans:** TBD
 
-**UI hint:** no
+**UI hint:** yes
 
 ---
 
@@ -49,17 +50,17 @@
 **Requirements:** NB-01, NB-02, NB-03, NB-04, NB-05, NB-06, PROT-01, PROT-02, PROT-03, PROT-04, PROT-05, OUT-01, OUT-02, OUT-03, OUT-04
 
 **Success Criteria** (what must be TRUE):
-1. CLI executes notebooks programmatically and captures output
+1. UI executes notebooks programmatically and captures output
 2. Config parameters are passed to notebooks at runtime
 3. Notebooks generate 384-well source plate layouts
 4. Notebooks generate 96-well destination plate layouts
 5. Dose-response matrix maps correctly to well positions
 6. CSV output follows Beckman Echo format (Source Well, Dest Well, Transfer Volume)
 7. Sample names and volumes appear in output CSV
-8. CSV files written to user-specified output directory
+8. CSV files downloadable from UI
 9. Output filename includes timestamp for versioning
 10. User can override output filename
-11. CLI displays path to generated files on success
+11. UI displays path to generated files on success
 
 **Plans:** TBD
 
@@ -88,11 +89,11 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Docker & CLI Foundation | 0/1 | Not started | - |
+| 1. Web UI & Docker Foundation | 0/1 | Not started | - |
 | 2. Notebook Execution & Output | 0/1 | Not started | - |
 | 3. Protocol Validation | 0/1 | Not started | - |
 
 ---
 
 *Generated: 2026-04-01*
-*Updated: 2026-04-01 after user feedback on Docker and config format*
+*Updated: 2026-04-01 after user feedback - web UI (Streamlit) instead of CLI*

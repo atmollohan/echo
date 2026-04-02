@@ -14,13 +14,18 @@
 - [ ] **DOCKER-05**: Docker image published to registry (Docker Hub or GHCR)
 - [ ] **DOCKER-06**: README includes both local and docker run instructions
 
-### CLI Interface
+### Web UI (Streamlit)
 
-- [ ] **CLI-01**: User can run protocol generator via `echo-run` command
-- [ ] **CLI-02**: User can specify config file path via `--config` flag
-- [ ] **CLI-03**: User can specify output directory via `--output` flag
-- [ ] **CLI-04**: CLI displays clear success/failure messages
-- [ ] **CLI-05**: CLI shows progress during notebook execution
+- [ ] **UI-01**: Project uses Streamlit for web interface
+- [ ] **UI-02**: User can upload or select config file via file picker
+- [ ] **UI-03**: User can view/edit experiment parameters in form fields
+- [ ] **UI-04**: User can select which notebook to run
+- [ ] **UI-05**: UI shows progress during notebook execution
+- [ ] **UI-06**: UI displays generated CSV output with download button
+- [ ] **UI-07**: UI shows validation errors clearly with suggestions
+- [ ] **UI-08**: UI works in browser and as desktop (streamlit webrunner)
+- [ ] **UI-09**: User can preview plate layouts before generating protocol
+- [ ] **UI-10**: UI can be run locally or in container
 
 ### Configuration Management
 

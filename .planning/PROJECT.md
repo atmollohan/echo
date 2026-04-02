@@ -2,15 +2,15 @@
 
 ## What This Is
 
-A user-friendly Python-based tool for running Jupyter notebooks that generate Beckman Echo liquid handler protocols. Designed for lab scientists who aren't coders — provides a clean interface to configure experiments, run notebooks, and export CSV protocols without touching notebook code.
+A user-friendly Python-based web app (Streamlit) for running Jupyter notebooks that generate Beckman Echo liquid handler protocols. Designed for lab scientists who aren't coders — provides a clean browser interface to configure experiments, run notebooks, and download CSV protocols without touching notebook code.
 
 ## Core Value
 
 A non-coder lab scientist can:
 1. Clone the repo (or pull the Docker image)
-2. Edit a simple config file with experiment parameters
-3. Run `docker run` (or `./echo-run` locally)
-4. Get validated CSV output for the Echo liquid handler
+2. Open the web interface in a browser
+3. Configure experiment parameters via form fields or upload a config file
+4. Click "Generate Protocol" and download validated CSV output
 
 No Python coding, no notebook editing, no complex setup required.
 

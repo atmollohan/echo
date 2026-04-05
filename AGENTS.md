@@ -1,8 +1,8 @@
-# Echo Lab Protocol Generator
+# Echo Protocol
 
 ## Project Overview
 
-**Echo Lab Protocol Generator** - A user-friendly web application for generating Beckman Echo liquid handler protocols.
+**Echo Protocol** - A user-friendly web application for generating Beckman Echo liquid handler protocols.
 
 **Core Value:** A non-coder lab scientist can:
 1. Clone the repo (or pull the Docker image)
@@ -112,8 +112,8 @@ streamlit run app.py
 Or with Conda:
 
 ```bash
-conda create -n echo-run python=3.11 -y
-conda activate echo-run
+conda create -n echo-protocol python=3.11 -y
+conda activate echo-protocol
 pip install -e .
 streamlit run app.py
 ```
@@ -121,10 +121,10 @@ streamlit run app.py
 ### Docker
 ```bash
 # Build
-docker build -t echo-run .
+docker build -t echo-protocol-generate .
 
 # Run
-docker run -p 8501:8501 echo-run
+docker run -p 8501:8501 echo-protocol-generate
 ```
 
 Then open http://localhost:8501 in your browser.

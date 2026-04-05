@@ -5,7 +5,7 @@ clean:
 install: venv activate
 	.venv/bin/pip install -e .
 run:
-	.venv/bin/echo-run
+	.venv/bin/echo-protocol-generate
 check:
 	python3 -m echo_run.cli --check
 test:

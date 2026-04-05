@@ -1,1 +1,1 @@
-"""Echo Lab Protocol Generator package."""
+"""Echo Protocol package."""

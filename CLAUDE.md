@@ -1,14 +1,14 @@
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
-**Echo Lab Protocol Generator**
+**Echo Protocol**
 
 A user-friendly Python-based tool for running Jupyter notebooks that generate Beckman Echo liquid handler protocols. Designed for lab scientists who aren't coders — provides a clean interface to configure experiments, run notebooks, and export CSV protocols without touching notebook code.
 
 **Core Value:** A non-coder lab scientist can:
 1. Clone the repo (or pull the Docker image)
 2. Edit a simple config file with experiment parameters
-3. Run `docker run` (or `echo-run` locally)
+3. Run `docker run` (or `echo-protocol-generate` locally)
 4. Use the web UI to configure experiments and inspect notebook workflows
 5. Generate validated CSV output for the Echo liquid handler once notebook execution is connected
 
@@ -122,7 +122,7 @@ No Python coding, no notebook editing, no complex setup required.
 - Pattern: Nested loops generating flat lists
 ## Entry Points
 - Location: `app.py` and `echo_run/cli.py`
-- Triggers: `echo-run`, `streamlit run app.py`, or Docker startup
+- Triggers: `echo-protocol-generate`, `streamlit run app.py`, or Docker startup
 - Responsibilities: UI startup, config loading, notebook selection, future notebook execution
 - Supporting protocol logic remains in `notebooks/*.ipynb`
 ## Error Handling

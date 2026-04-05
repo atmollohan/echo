@@ -19,7 +19,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-echo-run = "echo_run.cli:main"
+echo-protocol-generate = "echo_run.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["echo_run*"]

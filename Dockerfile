@@ -1,4 +1,4 @@
-# Echo Lab Protocol Generator Dockerfile
+# Echo Protocol Dockerfile
 
 FROM python:3.11-slim
 
@@ -32,4 +32,4 @@ ENV ECHO_NOTEBOOKS_DIR=/app/notebooks
 ENV ECHO_DATA_DIR=/app/data
 
 # Run the installed console script
-CMD ["echo-run"]
+CMD ["echo-protocol-generate"]

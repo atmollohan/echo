@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,12 +17,35 @@ from echo_run.preprocessing import (
 )
 
 
+@dataclass(frozen=True)
+class PremadePlateCase:
+    """Reference premade-plate scenario that should stay stable over time."""
+
+    case_id: str
+    experiment_name: str
+    premade_plate_name: str
+
+
+PREMADE_PLATE_CASES = {
+    "library_plate_a": PremadePlateCase(
+        case_id="library_plate_a",
+        experiment_name="plate_a_validation",
+        premade_plate_name="20240813_ML_L1_source_plateA.csv",
+    ),
+    "library_plate_b": PremadePlateCase(
+        case_id="library_plate_b",
+        experiment_name="plate_b_validation",
+        premade_plate_name="20240813_ML_L1_source_plateB.csv",
+    ),
+}
+
+
 class PreprocessingRunnerTests(unittest.TestCase):
-    def test_premade_plate_materializes_fixture_outputs(self) -> None:
+    def assert_premade_plate_case_materializes_fixture_outputs(self, case: PremadePlateCase) -> None:
         request = PreprocessingRequest(
-            experiment_name="plate_a_validation",
+            experiment_name=case.experiment_name,
             plate_mode=PLATE_MODE_PREMADE,
-            premade_plate_name="20240813_ML_L1_source_plateA.csv",
+            premade_plate_name=case.premade_plate_name,
             new_plate_label=None,
             doses=6,
             doses2=3,
@@ -44,6 +68,12 @@ class PreprocessingRunnerTests(unittest.TestCase):
             self.assertIn("Destination Well", composition_df.columns)
             self.assertIn("Composition", composition_df.columns)
             self.assertTrue(composition_df["Composition"].str.contains("antigen").any())
+
+    def test_library_plate_a_materializes_fixture_outputs(self) -> None:
+        self.assert_premade_plate_case_materializes_fixture_outputs(PREMADE_PLATE_CASES["library_plate_a"])
+
+    def test_library_plate_b_materializes_fixture_outputs(self) -> None:
+        self.assert_premade_plate_case_materializes_fixture_outputs(PREMADE_PLATE_CASES["library_plate_b"])
 
     def test_new_plate_requires_custom_workflow_implementation(self) -> None:
         request = PreprocessingRequest(

@@ -2,98 +2,104 @@
 
 **Phase count:** 3
 **Granularity:** standard
-**Coverage:** 32/32 v1 requirements mapped
+**Coverage:** refreshed against the current guided preprocessing workflow as of 2026-04-05
 
 ## Phases
 
-- [ ] **Phase 1: Web UI & Docker Foundation** — Streamlit app, Dockerfile, config loading
-- [ ] **Phase 2: Notebook Execution & Output** — Run notebooks, generate protocols, manage output
-- [ ] **Phase 3: Protocol Validation** — Validate CSV output, well formats, volumes
+- [x] **Phase 1: Guided Workflow Foundation** — Streamlit UI, CLI entry point, Docker packaging, fixture inspection
+- [ ] **Phase 2: Preprocessing Execution & Artifact Generation** — Real workflow execution, generated outputs, new-plate path
+- [ ] **Phase 3: Formal Protocol Validation & Trust Signals** — CSV validation, blocking errors, validation summaries
 
 ---
 
 ## Phase Details
 
-### Phase 1: Web UI & Docker Foundation
+### Phase 1: Guided Workflow Foundation
 
-**Goal:** User can open web interface in browser and generate protocols
+**Goal:** A scientist can launch the product, choose the guided preprocessing workflow, inspect committed examples, and start runs from the browser or CLI.
 
 **Depends on:** Nothing (first phase)
 
-**Requirements:** UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-09, UI-10, DOCKER-01, DOCKER-02, DOCKER-03, DOCKER-04, DOCKER-05, DOCKER-06, CFG-01, CFG-02, CFG-03, CFG-04, CFG-05, CFG-06, CFG-07, CFG-08, DATA-01, DATA-02, DATA-03
+**Status:** Substantially complete in the current repo
 
-**Success Criteria** (what must be TRUE):
-1. `streamlit run app.py` opens web interface in browser
-2. User can upload or select config file via file picker
-3. User can view/edit experiment parameters in form fields
-4. User can select which notebook to run
-5. UI shows progress during notebook execution
-6. UI displays generated CSV output with download button
-7. UI shows validation errors clearly with suggestions
-8. `Dockerfile` exists and builds with Streamlit
-9. `docker run -p 8501:8501 echo-run` opens web UI
-10. README includes both local and docker run instructions
-11. Example config file exists and is valid
+**Completed now:**
+1. `streamlit run app.py` and `echo-protocol-generate` launch the current UI
+2. Dockerfile exists and the README documents local and container workflows
+3. UI is centered on one fixed preprocessing workflow instead of generic notebook switching
+4. UI collects experiment parameters through form fields
+5. UI makes the main workflow decision explicit: `premade plate` versus `create a new plate from scratch`
+6. UI previews committed source plate CSVs from `data/raw`
+7. UI previews committed Echo protocol CSVs from `data/raw`
+8. CLI includes backend sanity checks and a preprocessing entry point
+9. Backend config parsing and example config file still exist for compatibility and future decisions
 
-**Plans:** TBD
+**Remaining to close the phase cleanly:**
+1. Decide whether config upload belongs in the UI or remains a CLI/backend capability
+2. Decide whether notebook selection returns as a user-facing feature or stays out of the guided UI
+3. Replace the current discovery questions with locked workflow requirements once the target lab flow is agreed
 
 **UI hint:** yes
 
 ---
 
-### Phase 2: Notebook Execution & Output
+### Phase 2: Preprocessing Execution & Artifact Generation
 
-**Goal:** Notebooks execute with config parameters and produce CSV output
+**Goal:** The fixed preprocessing workflow produces real, auditable artifacts from user inputs across both premade and new-plate flows.
 
 **Depends on:** Phase 1
 
-**Requirements:** NB-01, NB-02, NB-03, NB-04, NB-05, NB-06, PROT-01, PROT-02, PROT-03, PROT-04, PROT-05, OUT-01, OUT-02, OUT-03, OUT-04
+**Status:** In progress
 
-**Success Criteria** (what must be TRUE):
-1. UI executes notebooks programmatically and captures output
-2. Config parameters are passed to notebooks at runtime
-3. Notebooks generate 384-well source plate layouts
-4. Notebooks generate 96-well destination plate layouts
-5. Dose-response matrix maps correctly to well positions
-6. CSV output follows Beckman Echo format (Source Well, Dest Well, Transfer Volume)
-7. Sample names and volumes appear in output CSV
-8. CSV files downloadable from UI
-9. Output filename includes timestamp for versioning
-10. User can override output filename
-11. UI displays path to generated files on success
+**Completed now:**
+1. `echo_run.preprocessing` normalizes form and CLI inputs into a shared request model
+2. Premade plate runs can replay committed fixture CSVs into generated output folders
+3. The preprocessing runner writes an Echo protocol CSV, source plate CSV, destination composition CSV, and JSON run manifest for fixture replay mode
+4. The Streamlit UI and CLI both call the same preprocessing entry point
+5. Optional notebook execution support exists through papermill when `ECHO_WORKFLOW_NOTEBOOK` is configured
+6. UI surfaces generated artifact paths and download buttons for successful runs
 
-**Plans:** TBD
+**Remaining:**
+1. Implement or connect the actual `create a new plate from scratch` workflow
+2. Promote the optional notebook path into a supported, documented execution mode with predictable artifact names
+3. Ensure notebook mode and fixture mode both satisfy the same output contract
+4. Add stronger progress and failure reporting around notebook execution
+5. Decide whether timestamps, output naming controls, and saved run presets are required in v1
 
 ---
 
-### Phase 3: Protocol Validation
+### Phase 3: Formal Protocol Validation & Trust Signals
 
-**Goal:** Generated CSV protocols are validated before delivery to prevent errors
+**Goal:** Generated protocols are validated before delivery so users can trust outputs beyond visual inspection.
 
 **Depends on:** Phase 2
 
-**Requirements:** VAL-01, VAL-02, VAL-03, VAL-04, VAL-05
+**Status:** Not started as formal validation work, though visual inspection support exists
 
-**Success Criteria** (what must be TRUE):
-1. CSV output has required columns (Source Well, Dest Well, Transfer Volume)
-2. Well format matches plate type (A-P[1-24] for 384, A-H[1-12] for 96)
-3. Transfer volumes are within Echo limits (min 25nL)
-4. Duplicate destination wells with multiple transfers are detected
-5. Validation errors prevent output and show clear message
+**Completed now:**
+1. UI provides visual previews of source plate occupancy and destination-well composition from committed examples
+2. Tests exist for preprocessing fixture replay and protocol/source summary helpers
 
-**Plans:** TBD
+**Remaining:**
+1. Validate required protocol columns
+2. Validate well formats against 384-well and 96-well expectations
+3. Validate transfer volume bounds for Echo-compatible output
+4. Detect problematic duplicate or conflicting destination-well transfers
+5. Produce clear validation summaries and block export when rules fail
+6. Resolve the validation policy question: fail hard versus warn-and-continue
+
+**Planning note:** This phase should begin only after the real new-plate workflow and notebook-backed outputs are stable enough to validate consistently.
 
 ---
 
 ## Progress
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Web UI & Docker Foundation | 0/1 | Not started | - |
-| 2. Notebook Execution & Output | 0/1 | Not started | - |
-| 3. Protocol Validation | 0/1 | Not started | - |
+| Phase | Status | Already done | Remaining focus |
+|-------|--------|--------------|-----------------|
+| 1. Guided Workflow Foundation | Substantially complete | UI, CLI, Docker, docs, committed fixture previews | Lock the workflow scope around config uploads and notebook selection |
+| 2. Preprocessing Execution & Artifact Generation | In progress | Shared runner, fixture replay, output artifacts, papermill hook, UI downloads | New-plate implementation, stable notebook mode, stronger output contract |
+| 3. Formal Protocol Validation & Trust Signals | Not started | Visual inspection helpers and smoke tests | Formal CSV validation, blocking errors, trust/reporting layer |
 
 ---
 
 *Generated: 2026-04-01*
-*Updated: 2026-04-01 after user feedback - web UI (Streamlit) instead of CLI*
+*Updated: 2026-04-05 after reconciling roadmap with current repo state*

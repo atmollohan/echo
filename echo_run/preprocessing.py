@@ -79,18 +79,29 @@ def slugify_name(raw_name: str) -> str:
 
 def build_fixture_pair(premade_plate_name: str) -> tuple[Path, Path]:
     """Map a committed source plate CSV to its matching committed protocol CSV."""
-    source_plate_path = PROJECT_ROOT / "data" / "raw" / premade_plate_name
-    if not source_plate_path.exists():
+    raw_dir = PROJECT_ROOT / "data" / "raw"
+
+    source_matches = sorted(raw_dir.rglob(premade_plate_name))
+    if not source_matches:
         raise FileNotFoundError(f"Premade plate fixture not found: {premade_plate_name}")
+    if len(source_matches) > 1:
+        raise FileExistsError(f"Multiple premade plate fixtures match {premade_plate_name}: {source_matches}")
+
+    source_plate_path = source_matches[0]
 
     protocol_name = re.sub(
         r"_source_plate([A-Za-z0-9]+)\.csv$",
         r"_echo_protocol_plate\1.csv",
         premade_plate_name,
     )
-    protocol_path = source_plate_path.with_name(protocol_name)
-    if not protocol_path.exists():
+
+    protocol_matches = sorted(raw_dir.rglob(protocol_name))
+    if not protocol_matches:
         raise FileNotFoundError(f"Matching protocol fixture not found for {premade_plate_name}")
+    if len(protocol_matches) > 1:
+        raise FileExistsError(f"Multiple protocol fixtures match {protocol_name}: {protocol_matches}")
+
+    protocol_path = protocol_matches[0]
 
     return source_plate_path, protocol_path
 

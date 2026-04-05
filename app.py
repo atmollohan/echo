@@ -10,7 +10,6 @@ from echo_run.backend import (
     DEFAULT_CONFIG,
     build_echo_protocol_summary,
     build_source_plate_summary,
-    get_echo_protocol_paths,
     get_source_plate_map_paths,
     load_echo_protocol,
     load_source_plate_map,
@@ -20,6 +19,7 @@ from echo_run.preprocessing import (
     PLATE_MODE_NEW,
     PLATE_MODE_PREMADE,
     PreprocessingRequest,
+    build_fixture_pair,
     parse_samples,
     run_echo_protocol_preprocessing,
 )
@@ -129,14 +129,143 @@ def style_composition_plate_grid(composition_grid, component_count_grid, max_com
     )
 
 
-def prioritize_selected_path(paths, selected_name: str | None):
-    """Move the selected path to the front so it opens first in the UI."""
-    if not selected_name:
-        return paths
+def build_setup_summary_rows(
+    *,
+    plate_mode: str,
+    experiment_name: str,
+    doses: int,
+    doses2: int,
+    highest_dose: float,
+    vol_cellextract: int,
+    vol_antigen: int,
+    samples: str,
+    premade_plate_name: str | None = None,
+    new_plate_label: str | None = None,
+):
+    """Build ordered setup rows for reference and generated-run summaries."""
+    sample_list = parse_samples(samples)
+    rows = [
+        ("Experiment", experiment_name),
+        ("Plate mode", plate_mode),
+    ]
 
-    selected = [path for path in paths if path.name == selected_name]
-    remainder = [path for path in paths if path.name != selected_name]
-    return selected + remainder
+    if plate_mode == PLATE_MODE_PREMADE:
+        rows.append(("Selected premade plate", premade_plate_name or "n/a"))
+    else:
+        rows.append(("New plate label", new_plate_label or "n/a"))
+
+    rows.extend(
+        [
+            ("Doses", doses),
+            ("Second curve doses", doses2),
+            ("Highest dose", f"{highest_dose:g} µM"),
+            ("Cell extract volume", f"{vol_cellextract:,} nL"),
+            ("Antigen volume", f"{vol_antigen:,} nL"),
+            ("Sample count", len(sample_list)),
+            ("Samples", ", ".join(sample_list) if sample_list else "n/a"),
+        ]
+    )
+    return rows
+
+
+def render_setup_summary(st, heading: str, rows: list[tuple[str, object]], caption: str | None = None):
+    """Render a compact setup summary table."""
+    st.markdown(f"**{heading}**")
+    if caption:
+        st.caption(caption)
+    st.table(
+        {
+            "Setting": [label for label, _value in rows],
+            "Value": [value for _label, value in rows],
+        }
+    )
+
+
+def render_source_plate_panel(st, source_plate_path, heading: str):
+    """Render a source plate map with summary metrics."""
+    st.markdown(f"**{heading}**")
+    plate_map = load_source_plate_map(source_plate_path)
+    summary = build_source_plate_summary(plate_map)
+
+    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+    with metric_col1:
+        st.metric("Occupied Wells", summary["occupied_wells"])
+    with metric_col2:
+        st.metric("Empty Wells", summary["empty_wells"])
+    with metric_col3:
+        st.metric("Substances", len(summary["substances"]))
+    with metric_col4:
+        st.metric(
+            "Max Volume",
+            f"{summary['max_volume_nl']:,} nL" if summary["max_volume_nl"] else "n/a",
+        )
+
+    if summary["substances"]:
+        st.caption(f"Loaded materials: {', '.join(summary['substances'])}")
+    else:
+        st.info("No loaded wells were detected in this plate map.")
+
+    st.dataframe(
+        style_source_plate_map(
+            plate_map,
+            summary["max_volume_nl"],
+            summary["substances"],
+        ),
+        width="stretch",
+        height=560,
+    )
+    st.caption("Cells are colored by substance. Darker fills indicate larger loaded volumes.")
+
+
+def render_protocol_panel(st, protocol_path, heading: str):
+    """Render a protocol preview focused on validation-oriented review."""
+    st.markdown(f"**{heading}**")
+    protocol_df = load_echo_protocol(protocol_path)
+    summary = build_echo_protocol_summary(protocol_df)
+
+    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+    with metric_col1:
+        st.metric("Transfers", f"{summary['transfer_count']:,}")
+    with metric_col2:
+        st.metric("Samples", summary["sample_count"])
+    with metric_col3:
+        st.metric("Source Wells Used", summary["source_well_count"])
+    with metric_col4:
+        st.metric("Destination Wells Used", summary["destination_well_count"])
+
+    st.caption(f"Total transferred volume in this protocol: {summary['total_transfer_volume_nl']:,} nL")
+
+    st.markdown("**Destination well composition**")
+    st.dataframe(
+        style_composition_plate_grid(
+            summary["destination_composition_grid"],
+            summary["destination_component_count_grid"],
+            summary["destination_max_components"],
+        ),
+        width="stretch",
+        height=420,
+    )
+    st.caption("Each cell shows which sample/source components contribute to that destination well.")
+
+    max_transfer_count = 0
+    if not summary["destination_count_grid"].empty:
+        max_transfer_count = int(summary["destination_count_grid"].to_numpy().max())
+    st.markdown("**Destination plate transfer count per well**")
+    st.dataframe(
+        style_numeric_plate_grid(
+            summary["destination_count_grid"],
+            max_transfer_count,
+            "#2563eb",
+        ),
+        width="stretch",
+        height=420,
+    )
+    st.caption("This view shows how many individual transfers landed in each destination well.")
+
+    st.info(
+        "Use the destination composition map to see what each well contains, and the transfer-count "
+        "view to spot dense layouts before sending the protocol forward."
+    )
 
 
 def main():
@@ -151,7 +280,8 @@ def main():
     st.title("🔬 Echo Protocol")
     st.markdown(
         "Set up the preprocessing workflow, choose whether you are reusing a premade plate or "
-        "building a new one, and preview the committed plate/protocol examples in the repo."
+        "building a new one, review the paired reference workflow if you have a sample plate, and "
+        "then run the experiment to validate the generated protocol."
     )
 
     setup_col1, setup_col2 = st.columns(2)
@@ -171,7 +301,6 @@ def main():
     uploaded_values = DEFAULT_CONFIG.copy()
     source_plate_paths = get_source_plate_map_paths()
     source_plate_options = [path.name for path in source_plate_paths]
-    default_plate_name = source_plate_options[0] if source_plate_options else None
 
     st.subheader("Workflow Setup")
     st.caption(f"Target workflow: `{WORKFLOW_NAME}`")
@@ -266,134 +395,62 @@ def main():
         )
 
     st.divider()
-    st.subheader("Sample Source Plate Maps")
-    st.caption(
-        "These committed source plate CSVs show how the repo currently arranges reagents and test "
-        "materials across a 384-well source plate. Each colored cell represents a loaded well."
-    )
+    st.subheader("Reference Workflow Preview")
+    if plate_mode == PLATE_MODE_PREMADE and selected_plate_name:
+        st.caption(
+            "This paired reference view shows the selected premade source plate and the historical "
+            "protocol it should produce. Use it to understand the workflow before you run the current experiment."
+        )
 
-    if source_plate_paths:
-        ordered_source_paths = prioritize_selected_path(source_plate_paths, selected_plate_name)
-        plate_tabs = st.tabs([path.stem.replace("_", " ") for path in ordered_source_paths])
-        for tab, source_plate_path in zip(plate_tabs, ordered_source_paths):
-            with tab:
-                plate_map = load_source_plate_map(source_plate_path)
-                summary = build_source_plate_summary(plate_map)
+        selected_source_path = next((path for path in source_plate_paths if path.name == selected_plate_name), None)
+        try:
+            _, selected_protocol_path = build_fixture_pair(selected_plate_name)
+        except (FileNotFoundError, FileExistsError) as exc:
+            selected_protocol_path = None
+            st.warning(str(exc))
 
-                map_col, summary_col = st.columns([2.2, 1])
-                with map_col:
-                    st.dataframe(
-                        style_source_plate_map(
-                            plate_map,
-                            summary["max_volume_nl"],
-                            summary["substances"],
-                        ),
-                        width="stretch",
-                        height=560,
-                    )
-                    st.caption(
-                        "Cells are colored by substance. Darker fills indicate larger loaded volumes."
-                    )
+        render_setup_summary(
+            st,
+            "Reference Setup",
+            build_setup_summary_rows(
+                plate_mode=plate_mode,
+                experiment_name=experiment_name,
+                premade_plate_name=selected_plate_name,
+                doses=doses,
+                doses2=doses2,
+                highest_dose=highest_dose,
+                vol_cellextract=vol_cellextract,
+                vol_antigen=vol_antigen,
+                samples=samples,
+            ),
+            caption="These are the current run inputs for the selected premade workflow.",
+        )
 
-                with summary_col:
-                    metric_col1, metric_col2 = st.columns(2)
-                    with metric_col1:
-                        st.metric("Occupied Wells", summary["occupied_wells"])
-                        st.metric("Substances", len(summary["substances"]))
-                    with metric_col2:
-                        st.metric("Empty Wells", summary["empty_wells"])
-                        st.metric(
-                            "Max Volume",
-                            f"{summary['max_volume_nl']:,} nL" if summary["max_volume_nl"] else "n/a",
-                        )
-
-                    if summary["substances"]:
-                        st.markdown("**Loaded materials**")
-                        st.write(", ".join(summary["substances"]))
-                    else:
-                        st.info("No loaded wells were detected in this plate map.")
+        if selected_source_path and selected_protocol_path:
+            render_source_plate_panel(st, selected_source_path, "Reference Source Plate")
+            st.markdown("**Reference Validation Output**")
+            render_protocol_panel(st, selected_protocol_path, "Historical Protocol Output")
+        elif selected_source_path:
+            render_source_plate_panel(st, selected_source_path, "Reference Source Plate")
+    elif plate_mode == PLATE_MODE_PREMADE:
+        st.info("Select a premade plate to see the paired source-plate and reference-protocol preview.")
     else:
-        st.info("No committed source plate CSVs were found under `data/raw`.")
+        st.info(
+            "Reference source/protocol previews are available for the committed premade plate cases. "
+            "Generated outputs for new plates will appear after the workflow runs."
+        )
 
     st.divider()
-    st.subheader("Committed Echo Protocol Maps")
-    st.caption(
-        "These protocol CSVs show the transfer plan generated from the current notebook workflows. "
-        "They help explain which destination wells receive material and which source wells are used most heavily."
-    )
-
-    echo_protocol_paths = get_echo_protocol_paths()
-    if echo_protocol_paths:
-        protocol_tabs = st.tabs([path.stem.replace("_", " ") for path in echo_protocol_paths])
-        for tab, protocol_path in zip(protocol_tabs, echo_protocol_paths):
-            with tab:
-                protocol_df = load_echo_protocol(protocol_path)
-                summary = build_echo_protocol_summary(protocol_df)
-
-                metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-                with metric_col1:
-                    st.metric("Transfers", f"{summary['transfer_count']:,}")
-                with metric_col2:
-                    st.metric("Samples", summary["sample_count"])
-                with metric_col3:
-                    st.metric("Source Wells Used", summary["source_well_count"])
-                with metric_col4:
-                    st.metric("Destination Wells Used", summary["destination_well_count"])
-
-                st.caption(
-                    f"Total transferred volume in this protocol: {summary['total_transfer_volume_nl']:,} nL"
-                )
-
-                preview_col1, preview_col2 = st.columns(2)
-                with preview_col1:
-                    st.markdown("**Destination well composition**")
-                    st.dataframe(
-                        style_composition_plate_grid(
-                            summary["destination_composition_grid"],
-                            summary["destination_component_count_grid"],
-                            summary["destination_max_components"],
-                        ),
-                        width="stretch",
-                        height=420,
-                    )
-                    st.caption(
-                        "Each cell shows which sample/source components contribute to that destination well."
-                    )
-
-                with preview_col2:
-                    st.markdown("**Destination plate transfer count per well**")
-                    st.dataframe(
-                        style_numeric_plate_grid(
-                            summary["destination_count_grid"],
-                            int(summary["destination_count_grid"].to_numpy().max()),
-                            "#2563eb",
-                        ),
-                        width="stretch",
-                        height=420,
-                    )
-                    st.caption("This view shows how many individual transfers landed in each destination well.")
-
-                st.markdown("**How to read this protocol view**")
-                st.info(
-                    "Use the destination composition map to see what each well contains, and the "
-                    "transfer-count view to spot dense layouts before sending the protocol forward."
-                )
-    else:
-        st.info("No committed Echo protocol CSVs were found under `data/raw`.")
-
-    st.divider()
-    st.subheader("Questions To Shape The Product Workflow")
+    st.subheader("Open Workflow Questions")
     st.markdown(
         "\n".join(
             [
-                "1. When a user opens the product, should the very first choice always be `premade plate` versus `create a new plate`, or is there an earlier decision we should capture first?",
-                "2. If the user chooses a premade plate, what information do they need to specify besides the plate itself: experiment type, sample list, concentrations, replicate pattern, or destination layout?",
-                "3. If the user chooses to create a new plate from scratch, what are the minimum inputs required to build that plate correctly without opening the notebook?",
-                "4. Before the user clicks Run, what exact previews or checks would make them confident enough to trust the preprocessing step?",
-                "5. After Run, what deliverables should the product always create: the Echo protocol CSV, a source plate CSV, a destination composition CSV, a validation summary, or something else?",
-                "6. Which errors or warnings would be most valuable to catch automatically before a grad student sends the protocol to the robot?",
-                "7. For repeated experiments, would users prefer to clone a previous run, start from a saved preset, or reuse a premade plate with just a few parameter changes?",
-                "8. What would make this feel like a trustworthy lab product rather than a notebook wrapper: guided steps, plain-language labels, audit trails, downloadable summaries, or stronger validation?",
+                "1. If the user chooses a premade plate, what information do they need to specify besides the plate itself: experiment type, sample list, concentrations, replicate pattern, or destination layout?",
+                "2. If the user chooses to create a new plate from scratch, what are the minimum inputs required to build that plate correctly without opening the notebook?",
+                "3. Beyond the reference source plate and setup summary, what else should be previewed before a run?",
+                "4. Which errors or warnings would be most valuable to catch automatically before a grad student sends the protocol to the robot?",
+                "5. For repeated experiments, would users prefer to clone a previous run, start from a saved preset, or reuse a premade plate with just a few parameter changes?",
+                "6. What would make this feel like a trustworthy lab product rather than a notebook wrapper: guided steps, plain-language labels, audit trails, downloadable summaries, or stronger validation?",
             ]
         )
     )
@@ -402,6 +459,9 @@ def main():
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         generate_btn = st.button("🚀 Generate Protocol", type="primary", width="stretch")
+
+    if "last_run_result" not in st.session_state:
+        st.session_state["last_run_result"] = None
 
     if generate_btn:
         if plate_mode == PLATE_MODE_PREMADE and not selected_plate_name:
@@ -440,33 +500,87 @@ def main():
             except Exception as exc:
                 st.error(f"Preprocessing failed: {exc}")
             else:
+                st.session_state["last_run_result"] = {
+                    "experiment_name": experiment_name,
+                    "plate_mode": plate_mode,
+                    "premade_plate_name": selected_plate_name,
+                    "new_plate_label": new_plate_name if plate_mode == PLATE_MODE_NEW else None,
+                    "doses": doses,
+                    "doses2": doses2,
+                    "highest_dose": highest_dose,
+                    "vol_cellextract": vol_cellextract,
+                    "vol_antigen": vol_antigen,
+                    "samples": samples,
+                    "execution_mode": result.execution_mode,
+                    "output_dir": str(result.output_dir),
+                    "protocol_csv": str(result.protocol_csv) if result.protocol_csv else None,
+                    "destination_composition_csv": str(result.destination_composition_csv) if result.destination_composition_csv else None,
+                    "source_plate_csv": str(result.source_plate_csv) if result.source_plate_csv else None,
+                    "run_manifest_json": str(result.run_manifest_json),
+                }
                 st.success("Preprocessing run completed.")
-                st.caption(f"Execution mode: {result.execution_mode}")
-                st.code(str(result.output_dir))
-                st.markdown(
-                    """
-                    **Expected preprocessing outputs for this workflow are:**
-                    - an Echo protocol CSV
-                    - a destination composition CSV for validation and visualization
-                    - a source plate CSV and run manifest for auditability
-                    """
-                )
 
-                output_files = [
-                    ("Echo Protocol CSV", result.protocol_csv),
-                    ("Destination Composition CSV", result.destination_composition_csv),
-                    ("Source Plate CSV", result.source_plate_csv),
-                    ("Run Manifest JSON", result.run_manifest_json),
-                ]
-                for label, path in output_files:
-                    if path and path.exists():
-                        st.write(f"{label}: `{path.name}`")
-                        st.download_button(
-                            f"Download {label}",
-                            data=path.read_bytes(),
-                            file_name=path.name,
-                            mime="text/csv" if path.suffix == ".csv" else "application/json",
-                        )
+    last_run_result = st.session_state.get("last_run_result")
+    if last_run_result:
+        st.divider()
+        st.subheader("Latest Run Output")
+        st.caption(
+            f"Execution mode: `{last_run_result['execution_mode']}`. Review the generated source plate "
+            "and protocol together before downloading the final files."
+        )
+        st.code(last_run_result["output_dir"])
+
+        render_setup_summary(
+            st,
+            "Run Setup",
+            build_setup_summary_rows(
+                plate_mode=last_run_result["plate_mode"],
+                experiment_name=last_run_result["experiment_name"],
+                premade_plate_name=last_run_result.get("premade_plate_name"),
+                new_plate_label=last_run_result.get("new_plate_label"),
+                doses=last_run_result["doses"],
+                doses2=last_run_result["doses2"],
+                highest_dose=last_run_result["highest_dose"],
+                vol_cellextract=last_run_result["vol_cellextract"],
+                vol_antigen=last_run_result["vol_antigen"],
+                samples=last_run_result["samples"],
+            ),
+        )
+
+        generated_source_plate = last_run_result.get("source_plate_csv")
+        generated_protocol = last_run_result.get("protocol_csv")
+
+        if generated_source_plate and generated_protocol:
+            render_source_plate_panel(st, generated_source_plate, "Generated Source Plate")
+            st.markdown("**Generated Validation Output**")
+            render_protocol_panel(st, generated_protocol, "Generated Protocol Validation Preview")
+        else:
+            st.info(
+                "This run finished without both generated plate and protocol artifacts, so only the "
+                "downloadable files are shown below."
+            )
+
+        st.markdown("**Download run artifacts**")
+        output_files = [
+            ("Echo Protocol CSV", last_run_result.get("protocol_csv")),
+            ("Destination Composition CSV", last_run_result.get("destination_composition_csv")),
+            ("Source Plate CSV", last_run_result.get("source_plate_csv")),
+            ("Run Manifest JSON", last_run_result.get("run_manifest_json")),
+        ]
+        for label, raw_path in output_files:
+            if not raw_path:
+                continue
+            from pathlib import Path
+
+            path = Path(raw_path)
+            if path.exists():
+                st.write(f"{label}: `{path.name}`")
+                st.download_button(
+                    f"Download {label}",
+                    data=path.read_bytes(),
+                    file_name=path.name,
+                    mime="text/csv" if path.suffix == ".csv" else "application/json",
+                )
 
 
 if __name__ == "__main__":

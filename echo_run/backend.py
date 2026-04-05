@@ -119,7 +119,7 @@ def get_source_plate_map_paths(data_dir: Path | None = None) -> list[Path]:
     raw_dir = data_dir / "raw"
     if not raw_dir.exists():
         return []
-    return sorted(raw_dir.glob("*_source_plate*.csv"))
+    return sorted(raw_dir.rglob("*_source_plate*.csv"))
 
 
 def get_echo_protocol_paths(data_dir: Path | None = None) -> list[Path]:
@@ -129,7 +129,7 @@ def get_echo_protocol_paths(data_dir: Path | None = None) -> list[Path]:
     raw_dir = data_dir / "raw"
     if not raw_dir.exists():
         return []
-    return sorted(raw_dir.glob("*_echo_protocol*.csv"))
+    return sorted(raw_dir.rglob("*_echo_protocol*.csv"))
 
 
 def load_source_plate_map(csv_path: Path):

@@ -149,16 +149,17 @@ templates:
 Based on the committed raw outputs in `data/raw/`, the library plate A and B workflows have the
 strongest evidence of prior successful runs. Those raw files include:
 
+- case folders for each reference workflow under `data/raw/library_plate_a/` and `data/raw/library_plate_b/`
 - source plate layouts as 16x24 CSV grids
 - Echo transfer protocols with columns such as `Sample Name`, `Source Well`, `Destination Well`,
   and `Transfer Volume`
 
-The UI now renders the committed source plate layouts directly from `data/raw/*_source_plate*.csv`
-so a scientist can see which wells are loaded, what substance appears in each well, and the loaded
-volume per substance.
+When a scientist selects a premade reference case, the UI renders that source plate together with
+the paired historical protocol output so the workflow is easy to understand before running a new
+experiment.
 
-The app also renders committed Echo protocol CSVs from `data/raw/*_echo_protocol*.csv` so a
-scientist can preview destination well composition and transfer density across destination wells.
+After a run completes, the UI renders the generated source plate and generated protocol together so
+the protocol can be validated before the CSVs are downloaded.
 
 ## Project Structure
 
@@ -194,8 +195,8 @@ scientist can preview destination well composition and transfer density across d
 
 - The Streamlit UI is now shaped around one fixed preprocessing workflow instead of notebook switching.
 - The UI now makes the main workflow decision explicit: use a premade plate or create a new one from scratch.
-- The app now visualizes committed source plate CSVs from `data/raw` with color-coded well maps and per-substance summaries.
-- The app now visualizes committed Echo protocol CSVs from `data/raw` with destination composition and transfer-density previews.
+- The app now pairs each selected premade source plate with its reference protocol output instead of showing every committed output up front.
+- The app now shows generated source plate and protocol validation previews only after a workflow run completes.
 - The notebook list and documentation now reflect the notebook workflows that actually exist in the repo.
 - The Run button now calls a generic preprocessing runner that accepts form fields directly.
 - Premade Plate A and Plate B runs can already be validated against the committed fixture CSVs.
@@ -221,14 +222,12 @@ python3 -m unittest discover -s tests -v
 These are better questions to ask as you shape this into a useful product for grad students and
 other lab users, not just a thin wrapper around notebooks:
 
-1. When a user opens the product, should the very first choice always be `premade plate` versus `create a new plate`, or is there an earlier decision we should capture first?
-2. If the user chooses a premade plate, what information do they need to specify besides the plate itself: experiment type, sample list, concentrations, replicate pattern, or destination layout?
-3. If the user chooses to create a new plate from scratch, what are the minimum inputs required to build that plate correctly without opening the notebook?
-4. Before the user clicks Run, what exact previews or checks would make them confident enough to trust the preprocessing step?
-5. After Run, what deliverables should the product always create: the Echo protocol CSV, a source plate CSV, a destination composition CSV, a validation summary, or something else?
-6. Which errors or warnings would be most valuable to catch automatically before a grad student sends the protocol to the robot?
-7. For repeated experiments, would users prefer to clone a previous run, start from a saved preset, or reuse a premade plate with just a few parameter changes?
-8. What would make this feel like a trustworthy lab product rather than a notebook wrapper: guided steps, plain-language labels, audit trails, downloadable summaries, or stronger validation?
+1. If the user chooses a premade plate, what information do they need to specify besides the plate itself: experiment type, sample list, concentrations, replicate pattern, or destination layout?
+2. If the user chooses to create a new plate from scratch, what are the minimum inputs required to build that plate correctly without opening the notebook?
+3. Before the user clicks Run, what exact previews or checks would make them confident enough to trust the preprocessing step?
+4. Which errors or warnings would be most valuable to catch automatically before a grad student sends the protocol to the robot?
+5. For repeated experiments, would users prefer to clone a previous run, start from a saved preset, or reuse a premade plate with just a few parameter changes?
+6. What would make this feel like a trustworthy lab product rather than a notebook wrapper: guided steps, plain-language labels, audit trails, downloadable summaries, or stronger validation?
 
 ## License
 

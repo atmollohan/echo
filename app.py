@@ -3,89 +3,94 @@ Echo Lab Protocol Generator - Web UI
 A Streamlit app for generating Beckman Echo liquid handler protocols.
 """
 
-import streamlit as st
-import pandas as pd
-import os
-from pathlib import Path
-
-st.set_page_config(
-    page_title="Echo Lab Protocol Generator",
-    page_icon="🔬",
-    layout="wide"
-)
-
-NOTEBOOKS_DIR = Path("notebooks")
-DATA_DIR = Path("data")
-
-def get_notebooks():
-    """Get list of available notebooks."""
-    if not NOTEBOOKS_DIR.exists():
-        return []
-    return [f.name for f in NOTEBOOKS_DIR.glob("*.ipynb") if not f.name.endswith("-checkpoint.ipynb")]
-
-def load_config_from_file(uploaded_file):
-    """Load config from uploaded INI file."""
-    import configparser
-    config = configparser.ConfigParser()
-    config.read_string(uploaded_file.getvalue().decode("utf-8"))
-    return config
+from echo_run.backend import DEFAULT_CONFIG, get_notebooks, parse_uploaded_config
 
 def main():
+    import streamlit as st
+
+    st.set_page_config(
+        page_title="Echo Lab Protocol Generator",
+        page_icon="🔬",
+        layout="wide"
+    )
+
     st.title("🔬 Echo Lab Protocol Generator")
-    st.markdown("Generate Beckman Echo liquid handler protocols from experiment parameters.")
+    st.markdown(
+        "Configure experiment parameters, inspect available notebooks, and preview the current "
+        "protocol-generation workflow."
+    )
 
     # Sidebar for configuration
+    uploaded_values = DEFAULT_CONFIG.copy()
+    uploaded_notebook = None
+    uploaded_config_name = None
+    upload_error = None
+
     with st.sidebar:
         st.header("Configuration")
-        
-        # Config file uploader
-        uploaded_config = st.file_uploader(
-            "Upload config file (.ini)", 
-            type=["ini", "cfg", "txt"],
-            help="Upload an INI config file or manually enter parameters below"
-        )
-        
+
         notebook_options = get_notebooks()
+        default_notebook_index = 0
         selected_notebook = st.selectbox(
             "Select Notebook",
             notebook_options if notebook_options else ["No notebooks found"],
-            help="Choose which notebook to run for protocol generation"
+            index=default_notebook_index,
+            help="Choose which notebook template or workflow to use first"
         )
-        
+
         st.divider()
-        st.info("💡 Tip: You can edit parameters manually below or upload a config file.")
+        st.subheader("Notebook Config")
+
+        uploaded_config = st.file_uploader(
+            "Upload config file (.ini)",
+            type=["ini", "cfg", "txt"],
+            help="Upload an INI config file after choosing a notebook",
+        )
+
+        if uploaded_config is not None:
+            uploaded_config_name = uploaded_config.name
+            try:
+                uploaded_values, uploaded_notebook = parse_uploaded_config(uploaded_config)
+                if notebook_options and uploaded_notebook in notebook_options:
+                    selected_notebook = uploaded_notebook
+            except Exception as exc:
+                upload_error = str(exc)
+
+        st.divider()
+        st.info(
+            "Workflow tip: choose a notebook first, then load the config that belongs to "
+            "that notebook."
+        )
 
     # Main form for experiment parameters
     st.subheader("Experiment Parameters")
+    st.caption(f"Selected notebook: {selected_notebook}")
+    st.info(
+        "Current notebooks are still mostly self-contained templates. Core dose and volume fields "
+        "line up better than `Experiment Name` or `Sample Names`, which are not yet used by every "
+        "notebook."
+    )
     
     col1, col2 = st.columns(2)
     
     with col1:
-        experiment_name = st.text_input("Experiment Name", value="my_experiment", help="Used in output filename")
-        doses = st.number_input("Number of Doses", min_value=1, max_value=24, value=6, help="Number of points in dose curve")
-        doses2 = st.number_input("Number of Doses (Second Curve)", min_value=0, max_value=24, value=3, help="Number of points in second antigen dose curve")
-        highest_dose = st.number_input("Highest Dose (µM)", min_value=0.1, max_value=100.0, value=4.0, step=0.1, help="Highest dose concentration in micromolar")
+        experiment_name = st.text_input("Experiment Name", value=uploaded_values["experiment_name"], help="Used in output filename")
+        doses = st.number_input("Number of Doses", min_value=1, max_value=24, value=uploaded_values["doses"], help="Number of points in dose curve")
+        doses2 = st.number_input("Number of Doses (Second Curve)", min_value=0, max_value=24, value=uploaded_values["doses2"], help="Number of points in second antigen dose curve")
+        highest_dose = st.number_input("Highest Dose (µM)", min_value=0.1, max_value=100.0, value=uploaded_values["highest_dose"], step=0.1, help="Highest dose concentration in micromolar")
     
     with col2:
-        vol_cellextract = st.number_input("Cell Extract Volume (nL)", min_value=1, max_value=100000, value=2000, help="Volume of cell extract per well in nanoliters")
-        vol_antigen = st.number_input("Antigen Volume (nL)", min_value=1, max_value=100000, value=2000, help="Volume of antigen per well in nanoliters")
-        samples = st.text_input("Sample Names", value="sample1,sample2,sample3", help="Comma-separated list of sample names")
+        vol_cellextract = st.number_input("Cell Extract Volume (nL)", min_value=1, max_value=100000, value=uploaded_values["vol_cellextract"], help="Volume of cell extract per well in nanoliters")
+        vol_antigen = st.number_input("Antigen Volume (nL)", min_value=1, max_value=100000, value=uploaded_values["vol_antigen"], help="Volume of antigen per well in nanoliters")
+        samples = st.text_input("Sample Names", value=uploaded_values["samples"], help="Comma-separated list of sample names")
 
     # If config file uploaded, show override option
     if uploaded_config is not None:
-        st.success(f"✅ Config file loaded: {uploaded_config.name}")
-        
-        # Parse and show loaded values (non-editable for now - v1 simple)
-        try:
-            import configparser
-            config = configparser.ConfigParser()
-            config.read_string(uploaded_config.getvalue().decode("utf-8"))
-            if config.has_section('experiment'):
-                st.caption("Loaded from file:")
-                for key, val in config['experiment'].items():
-                    st.caption(f"  {key} = {val}")
-        except Exception as e:
-            st.warning(f"Could not parse config: {e}")
+        if upload_error:
+            st.warning(f"Could not parse config: {upload_error}")
+        else:
+            st.success(f"Config file loaded: {uploaded_config_name}")
+            st.caption("Form fields were pre-populated from the uploaded config.")
 
     st.divider()
     
@@ -100,22 +105,24 @@ def main():
         else:
             st.info(f"📋 Running notebook: {selected_notebook}")
             
-            # Progress indicator (placeholder for now - notebook execution in Phase 2)
+            # Protocol execution is still being wired up; keep the UI honest for now.
             with st.spinner("Running experiment..."):
                 import time
                 time.sleep(1)  # Simulate work
                 
-            st.success("✅ Protocol generated successfully!")
+            st.warning("Notebook execution is not implemented yet in the Streamlit app.")
             
-            # Show sample output (placeholder)
-            st.subheader("Output Files")
-            st.info("Output CSV files would appear here after Phase 2 implementation.")
+            st.subheader("Current Status")
+            st.info(
+                "The web UI is ready for configuration and notebook selection, but the Generate "
+                "button is still a placeholder until notebook execution is connected."
+            )
             
-            # Show what would be generated
+            # Show what the current notebook workflows have historically produced.
             st.markdown("""
-            **Generated files would include:**
-            - `setup_source_{experiment_name}.csv` - Source plate layout
-            - `setup_dest_{experiment_name}.csv` - Destination plate protocol
+            **Historical notebook outputs in this repo include:**
+            - source plate map CSVs such as `20240813_ML_L1_source_plateA.csv`
+            - Echo protocol CSVs such as `20240813_ML_L1_echo_protocol_plateA.csv`
             """)
     
     # Show existing notebooks info

@@ -1,2 +1,12 @@
 .env
 .venv
+.venv-test
+venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+*.egg-info/

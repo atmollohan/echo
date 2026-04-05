@@ -8,8 +8,9 @@ A user-friendly Python-based tool for running Jupyter notebooks that generate Be
 **Core Value:** A non-coder lab scientist can:
 1. Clone the repo (or pull the Docker image)
 2. Edit a simple config file with experiment parameters
-3. Run `docker run` (or `./echo-run` locally)
-4. Get validated CSV output for the Echo liquid handler
+3. Run `docker run` (or `echo-run` locally)
+4. Use the web UI to configure experiments and inspect notebook workflows
+5. Generate validated CSV output for the Echo liquid handler once notebook execution is connected
 
 No Python coding, no notebook editing, no complex setup required.
 
@@ -27,7 +28,7 @@ No Python coding, no notebook editing, no complex setup required.
 - Python 3 - Data analysis, notebook execution, plate map generation
 - Jupyter - Interactive notebooks for experiment analysis
 ## Runtime
-- Python 3 virtual environment (`.venv/`)
+- Python 3 virtual environment (`.venv/`) or Conda environment
 - Package Manager: pip (via requirements.txt)
 - matplotlib - Data visualization
 - notebook - Jupyter notebooks
@@ -39,14 +40,14 @@ No Python coding, no notebook editing, no complex setup required.
 - NumPy - Numerical operations for dose calculations
 - Matplotlib - Plate heatmaps, dose-response curves
 ## Configuration
-- Virtual environment setup via makefile
+- Virtual environment or Conda environment setup for local development
 - No environment variables used
 - `makefile` - Automates venv creation and dependency installation
 - `requirements.txt` - Python dependencies
 - Jupyter notebooks (`.ipynb`) for all analysis code
 ## Platform Requirements
 - Python 3
-- Virtual environment (created via makefile)
+- Virtual environment or Conda environment
 - Not applicable - local analysis only
 <!-- GSD:stack-end -->
 
@@ -90,7 +91,7 @@ No Python coding, no notebook editing, no complex setup required.
 ## Architecture
 
 ## Pattern Overview
-- Notebooks contain all logic - no separate Python modules
+- Notebooks contain protocol logic, while the Python package provides the UI and startup entry point
 - Direct manipulation of lists/arrays for plate operations
 - CSV generation for Beckman Echo liquid handler protocols
 - Experiment parameter configuration via notebook cells
@@ -120,9 +121,10 @@ No Python coding, no notebook editing, no complex setup required.
 - Purpose: Map variant → dose point → well
 - Pattern: Nested loops generating flat lists
 ## Entry Points
-- Location: `notebooks/library-PLATE-A.ipynb`, `notebooks/library-PLATE-B.ipynb`
-- Triggers: Manual execution in Jupyter
-- Responsibilities: All experiment setup through protocol output
+- Location: `app.py` and `echo_run/cli.py`
+- Triggers: `echo-run`, `streamlit run app.py`, or Docker startup
+- Responsibilities: UI startup, config loading, notebook selection, future notebook execution
+- Supporting protocol logic remains in `notebooks/*.ipynb`
 ## Error Handling
 - Print statements for verification (`print(variants)`, `print(num_samples)`)
 - Checkpoint notebooks saved as backups (`*-checkpoint.ipynb`)

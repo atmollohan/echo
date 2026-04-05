@@ -1,3 +1,6 @@
+streamlit
+papermill
+jupyter
 matplotlib
 notebook
 numpy

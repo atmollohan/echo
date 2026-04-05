@@ -37,6 +37,7 @@ No Python coding, no notebook editing, no complex setup required.
 ### Runtime
 - Python 3.11+
 - Docker (for containerized deployment)
+- Python virtual environments or Conda environments for local use
 - uv or pip for dependency management
 
 ---
@@ -85,8 +86,10 @@ No Python coding, no notebook editing, no complex setup required.
 ├── Dockerfile                # Docker container
 ├── README.md                 # Usage instructions
 ├── notebooks/                # Protocol generation notebooks
-│   ├── library-PLATE-A.ipynb
-│   └── library-PLATE-B.ipynb
+│   ├── library_plate_a_protocol.ipynb
+│   ├── library_plate_b_protocol.ipynb
+│   ├── premade_sensor_dual_antigen_protocol.ipynb
+│   └── dual_antigen_expression_protocol.ipynb
 └── data/                     # Sample data
     └── raw/
 ```
@@ -97,10 +100,21 @@ No Python coding, no notebook editing, no complex setup required.
 
 ### Local Development
 ```bash
-# Install dependencies
+# Python venv
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 
 # Run web UI
+streamlit run app.py
+```
+
+Or with Conda:
+
+```bash
+conda create -n echo-run python=3.11 -y
+conda activate echo-run
+pip install -e .
 streamlit run app.py
 ```
 
@@ -129,7 +143,7 @@ highest_dose = 4
 vol_cellextract = 2000
 vol_antigen = 2000
 samples = sample1,sample2,sample3
-notebook = library-PLATE-A.ipynb
+notebook = library_plate_a_protocol.ipynb
 ```
 
 ---
@@ -137,6 +151,7 @@ notebook = library-PLATE-A.ipynb
 ## Notes
 
 - Units for all volumes are in nanoliters (nL)
-- Notebooks require hardcoded parameters currently (v1)
+- Notebooks still rely heavily on hardcoded parameters and internal variant lists
 - Output format: Beckman Echo CSV (Source Well, Dest Well, Transfer Volume)
+- `data/raw/` contains historical source plate maps and Echo protocol CSVs for the library plate workflows
 - Validation layer coming in future phase

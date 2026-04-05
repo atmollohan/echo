@@ -3,6 +3,12 @@ activate:
 clean:
 	rm -rf __pycache__ .venv
 install: venv activate
-	pip install -r requirements.txt
+	.venv/bin/pip install -e .
+run:
+	.venv/bin/echo-run
+check:
+	python3 -m echo_run.cli --check
+test:
+	python3 -m unittest discover -s tests -v
 venv:
 	python3 -m venv .venv

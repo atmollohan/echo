@@ -11,19 +11,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml .
-COPY requirements.txt .  # Fallback
-COPY app.py .
-COPY config.example.ini .
+COPY pyproject.toml README.md ./
+COPY requirements.txt ./
+COPY app.py ./
+COPY config.example.ini ./
+COPY echo_run/ ./echo_run/
 COPY notebooks/ ./notebooks/
 COPY data/ ./data/
 
-# Install Python dependencies
-# Try uv first (faster), fall back to pip
-RUN pip install uv 2>/dev/null && \
-    uv pip install --system -r pyproject.toml 2>/dev/null || \
-    pip install -r pyproject.toml || \
-    pip install streamlit pandas numpy matplotlib tqdm papermill jupyter
+# Install the project and its dependencies.
+RUN pip install --no-cache-dir .
 
 # Expose Streamlit port
 EXPOSE 8501
@@ -31,6 +28,8 @@ EXPOSE 8501
 # Set environment for Streamlit
 ENV STREAMLIT_SERVER_PORT=8501
 ENV STREAMLIT_SERVER_HEADLESS=true
+ENV ECHO_NOTEBOOKS_DIR=/app/notebooks
+ENV ECHO_DATA_DIR=/app/data
 
-# Run Streamlit
-CMD ["streamlit", "run", "app.py", "--server.address", "0.0.0.0"]
+# Run the installed console script
+CMD ["echo-run"]

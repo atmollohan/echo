@@ -15,12 +15,11 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.streamlit]
-server.port = 8501
-server.address = "0.0.0.0"
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
 
 [project.scripts]
 echo-run = "echo_run.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["echo_run*"]

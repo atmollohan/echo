@@ -16,6 +16,7 @@ from echo_run.backend import PROJECT_ROOT, load_echo_protocol
 WORKFLOW_NAME = "echo-protocol-preprocessing"
 PLATE_MODE_PREMADE = "Use a premade plate"
 PLATE_MODE_NEW = "Create a new plate from scratch"
+PLATE_MODE_MANUAL = "Define manually"
 PLATE_SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
 
@@ -33,6 +34,7 @@ class PreprocessingRequest:
     vol_cellextract: int
     vol_antigen: int
     samples: list[str]
+    manual_source_plate: dict[str, tuple[str, int]] | None = None  # well -> (substance, volume_nL)
 
 
 @dataclass(frozen=True)
@@ -55,9 +57,12 @@ def get_output_dir() -> Path:
 
 
 def get_workflow_notebook_path() -> Path | None:
-    """Return the optional custom preprocessing notebook path, if configured."""
+    """Return the preprocessing notebook path, if available."""
     raw_path = os.environ.get("ECHO_WORKFLOW_NOTEBOOK")
     if not raw_path:
+        default_notebook = PROJECT_ROOT / "notebooks" / "echo-protocol-preprocessing.ipynb"
+        if default_notebook.exists():
+            return default_notebook
         return None
     notebook_path = Path(raw_path)
     if not notebook_path.is_absolute():
@@ -109,22 +114,27 @@ def build_fixture_pair(premade_plate_name: str) -> tuple[Path, Path]:
 def build_destination_composition_table(protocol_df: pd.DataFrame) -> pd.DataFrame:
     """Flatten protocol composition into a CSV that is easy to inspect later."""
     grouped = (
-        protocol_df.groupby(["Destination Well", "Sample Name", "Source Well"], as_index=False)
-        .agg(total_volume_nl=("Transfer Volume", "sum"))
+        protocol_df.groupby(["Destination Well", "Source Well"], as_index=False)
+        .agg(
+            sample_names=("Sample Name", lambda x: ",".join(x.unique())),
+            total_volume_nl=("Transfer Volume", "sum"),
+        )
     )
 
     rows: list[dict[str, object]] = []
-    for destination_well, destination_df in grouped.groupby("Destination Well"):
-        ordered = destination_df.sort_values(["total_volume_nl", "Sample Name"], ascending=[False, True])
-        composition = " | ".join(
-            f"{sample}@{source}: {volume:,} nL"
-            for sample, source, volume in ordered[["Sample Name", "Source Well", "total_volume_nl"]].itertuples(index=False, name=None)
-        )
+    for destination_well, dest_df in grouped.groupby("Destination Well"):
+        comps = []
+        total_vol = 0
+        for _, row in dest_df.iterrows():
+            comps.append(f"{row['sample_names']}@{row['Source Well']}: {row['total_volume_nl']:,} nL")
+            total_vol += row['total_volume_nl']
+        
+        composition = " | ".join(comps)
         rows.append(
             {
                 "Destination Well": destination_well,
-                "Component Count": int(len(ordered)),
-                "Total Transfer Volume (nL)": int(ordered["total_volume_nl"].sum()),
+                "Component Count": len(dest_df),
+                "Total Transfer Volume (nL)": int(total_vol),
                 "Composition": composition,
             }
         )
@@ -186,23 +196,24 @@ def execute_notebook_workflow(
         raise RuntimeError("Papermill is required to execute the preprocessing notebook.") from exc
 
     notebook_output_path = output_dir / f"{slugify_name(request.experiment_name)}_preprocessing_output.ipynb"
+    parameters = {
+        "workflow_name": WORKFLOW_NAME,
+        "plate_mode": request.plate_mode,
+        "premade_plate_name": request.premade_plate_name,
+        "new_plate_label": request.new_plate_label,
+        "experiment_name": request.experiment_name,
+        "doses": request.doses,
+        "doses2": request.doses2,
+        "highest_dose": request.highest_dose,
+        "vol_cellextract": request.vol_cellextract,
+        "vol_antigen": request.vol_antigen,
+        "samples": request.samples,
+        "output_dir": str(output_dir),
+    }
     pm.execute_notebook(
         str(notebook_path),
         str(notebook_output_path),
-        parameters={
-            "workflow_name": WORKFLOW_NAME,
-            "plate_mode": request.plate_mode,
-            "premade_plate_name": request.premade_plate_name,
-            "new_plate_label": request.new_plate_label,
-            "experiment_name": request.experiment_name,
-            "doses": request.doses,
-            "doses2": request.doses2,
-            "highest_dose": request.highest_dose,
-            "vol_cellextract": request.vol_cellextract,
-            "vol_antigen": request.vol_antigen,
-            "samples": request.samples,
-            "output_dir": str(output_dir),
-        },
+        parameters=parameters,
     )
 
     manifest_path = write_run_manifest(output_dir, request, execution_mode="notebook")
@@ -231,6 +242,10 @@ def run_echo_protocol_preprocessing(
     target_dir = output_dir or (get_output_dir() / slugify_name(request.experiment_name))
     target_dir.mkdir(parents=True, exist_ok=True)
 
+    # Manual plate mode uses custom logic, not the notebook
+    if request.plate_mode == PLATE_MODE_MANUAL and request.manual_source_plate:
+        return execute_manual_plate_workflow(request, target_dir)
+
     notebook_path = workflow_notebook_path or get_workflow_notebook_path()
     if notebook_path and notebook_path.exists():
         return execute_notebook_workflow(request, target_dir, notebook_path)
@@ -241,4 +256,98 @@ def run_echo_protocol_preprocessing(
     raise NotImplementedError(
         "Creating a new plate from scratch requires a parameterized preprocessing notebook or "
         "Python implementation. Set ECHO_WORKFLOW_NOTEBOOK once that workflow exists."
+    )
+
+
+def execute_manual_plate_workflow(
+    request: PreprocessingRequest,
+    output_dir: Path,
+) -> PreprocessingResult:
+    """Generate protocol from manually defined source plate."""
+    from echo_run.backend import load_echo_protocol
+
+    experiment_slug = slugify_name(request.experiment_name)
+
+    plate_rows = list("ABCDEFGHIJKLMNOP")
+    plate_columns = list(range(1, 25))
+
+    source_plate_df = pd.DataFrame(index=plate_rows, columns=plate_columns)
+    for well, (substance, volume) in request.manual_source_plate.items():
+        row = well[0]
+        col = int(well[1:])
+        if row in plate_rows and col in plate_columns:
+            source_plate_df.iat[plate_rows.index(row), plate_columns.index(col)] = f"{substance}: {volume}nL"
+
+    source_plate_path = output_dir / f"{experiment_slug}_source_plate.csv"
+    source_plate_df.to_csv(source_plate_path)
+
+    # Build lookup: substance -> list of wells
+    substance_wells: dict[str, list[str]] = {}
+    for well, (substance, volume) in request.manual_source_plate.items():
+        if substance not in substance_wells:
+            substance_wells[substance] = []
+        substance_wells[substance].append(well)
+
+    transfers = []
+    for dest_idx, sample in enumerate(request.samples):
+        if dest_idx >= 96:
+            break
+        dest_well = f"{plate_rows[dest_idx // 12]}{plate_columns[dest_idx % 12]}"
+
+        sample_wells = substance_wells.get(sample, [])
+        if sample_wells:
+            transfers.append({
+                "Sample Name": sample,
+                "Source Plate Name": "source_plate",
+                "Source Well": sample_wells[0],
+                "Destination Well": dest_well,
+                "Transfer Volume": request.vol_cellextract,
+                "Destination Plate Name": "dest_plate",
+                "Source Plate Type": "384PP_AQ_BP",
+            })
+
+        antigen_wells = substance_wells.get("antigen", [])
+        if antigen_wells:
+            for dose_idx in range(request.doses):
+                transfers.append({
+                    "Sample Name": sample,
+                    "Source Plate Name": "source_plate",
+                    "Source Well": antigen_wells[0],
+                    "Destination Well": dest_well,
+                    "Transfer Volume": request.vol_antigen,
+                    "Destination Plate Name": "dest_plate",
+                    "Source Plate Type": "384PP_AQ_BP",
+                })
+
+        pbs_wells = substance_wells.get("PBS", [])
+        if pbs_wells:
+            transfers.append({
+                "Sample Name": sample,
+                "Source Plate Name": "source_plate",
+                "Source Well": pbs_wells[0],
+                "Destination Well": dest_well,
+                "Transfer Volume": request.vol_antigen,
+                "Destination Plate Name": "dest_plate",
+                "Source Plate Type": "384PP_AQ_BP",
+            })
+
+    protocol_df = pd.DataFrame(transfers)
+    protocol_path = output_dir / f"{experiment_slug}_echo_protocol.csv"
+    protocol_df.to_csv(protocol_path, index=False)
+
+    composition_df = build_destination_composition_table(protocol_df)
+    composition_path = output_dir / f"{experiment_slug}_destination_composition.csv"
+    composition_df.to_csv(composition_path, index=False)
+
+    manifest_path = write_run_manifest(output_dir, request, execution_mode="manual_plate")
+
+    return PreprocessingResult(
+        workflow_name=WORKFLOW_NAME,
+        execution_mode="manual_plate",
+        output_dir=output_dir,
+        protocol_csv=protocol_path,
+        source_plate_csv=source_plate_path,
+        destination_composition_csv=composition_path,
+        run_manifest_json=manifest_path,
+        notebook_output_path=None,
     )

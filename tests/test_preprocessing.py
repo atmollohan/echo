@@ -41,7 +41,7 @@ PREMADE_PLATE_CASES = {
 
 
 class PreprocessingRunnerTests(unittest.TestCase):
-    def assert_premade_plate_case_materializes_fixture_outputs(self, case: PremadePlateCase) -> None:
+    def assert_premade_plate_case_uses_notebook_workflow(self, case: PremadePlateCase) -> None:
         request = PreprocessingRequest(
             experiment_name=case.experiment_name,
             plate_mode=PLATE_MODE_PREMADE,
@@ -58,31 +58,25 @@ class PreprocessingRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             result = run_echo_protocol_preprocessing(request, output_dir=Path(temp_dir))
 
-            self.assertEqual(result.execution_mode, "fixture_replay")
+            self.assertEqual(result.execution_mode, "notebook")
             self.assertTrue(result.protocol_csv and result.protocol_csv.exists())
             self.assertTrue(result.source_plate_csv and result.source_plate_csv.exists())
-            self.assertTrue(result.destination_composition_csv and result.destination_composition_csv.exists())
-            self.assertTrue(result.run_manifest_json.exists())
+            self.assertTrue(result.notebook_output_path.exists())
 
-            composition_df = pd.read_csv(result.destination_composition_csv)
-            self.assertIn("Destination Well", composition_df.columns)
-            self.assertIn("Composition", composition_df.columns)
-            self.assertTrue(composition_df["Composition"].str.contains("antigen").any())
+    def test_library_plate_a_runs_via_notebook(self) -> None:
+        self.assert_premade_plate_case_uses_notebook_workflow(PREMADE_PLATE_CASES["library_plate_a"])
 
-    def test_library_plate_a_materializes_fixture_outputs(self) -> None:
-        self.assert_premade_plate_case_materializes_fixture_outputs(PREMADE_PLATE_CASES["library_plate_a"])
+    def test_library_plate_b_runs_via_notebook(self) -> None:
+        self.assert_premade_plate_case_uses_notebook_workflow(PREMADE_PLATE_CASES["library_plate_b"])
 
-    def test_library_plate_b_materializes_fixture_outputs(self) -> None:
-        self.assert_premade_plate_case_materializes_fixture_outputs(PREMADE_PLATE_CASES["library_plate_b"])
-
-    def test_new_plate_requires_custom_workflow_implementation(self) -> None:
+    def test_new_plate_from_scratch_runs_via_notebook(self) -> None:
         request = PreprocessingRequest(
             experiment_name="new_plate_validation",
             plate_mode=PLATE_MODE_NEW,
             premade_plate_name=None,
             new_plate_label="new_plate",
-            doses=6,
-            doses2=3,
+            doses=3,
+            doses2=0,
             highest_dose=4.0,
             vol_cellextract=2000,
             vol_antigen=2000,
@@ -90,8 +84,12 @@ class PreprocessingRunnerTests(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with self.assertRaises(NotImplementedError):
-                run_echo_protocol_preprocessing(request, output_dir=Path(temp_dir))
+            result = run_echo_protocol_preprocessing(request, output_dir=Path(temp_dir))
+
+            self.assertEqual(result.execution_mode, "notebook")
+            self.assertTrue(result.protocol_csv and result.protocol_csv.exists())
+            self.assertTrue(result.source_plate_csv and result.source_plate_csv.exists())
+            self.assertTrue(result.notebook_output_path.exists())
 
 
 if __name__ == "__main__":

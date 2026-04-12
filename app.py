@@ -18,6 +18,7 @@ from echo_run.backend import (
 from echo_run.preprocessing import (
     PLATE_MODE_NEW,
     PLATE_MODE_PREMADE,
+    PLATE_MODE_MANUAL,
     PreprocessingRequest,
     build_fixture_pair,
     parse_samples,
@@ -35,6 +36,79 @@ PLATE_COLORS = [
     "#4f46e5",
 ]
 WORKFLOW_NAME = "echo-protocol-preprocessing"
+
+
+def get_plate_wells():
+    """Return list of 384 well positions A1-P24."""
+    rows = list("ABCDEFGHIJKLMNOP")
+    cols = list(range(1, 25))
+    return [f"{r}{c}" for r in rows for c in cols]
+
+
+def render_manual_plate_editor(st, key_prefix: str = "manual"):
+    """Render an editable 384-well plate grid using data editor."""
+    st.caption("Edit wells below. Format: `name: volume` (e.g., `sample1: 60000`). Empty = no data.")
+
+    if f"{key_prefix}_plate_data" not in st.session_state:
+        st.session_state[f"{key_prefix}_plate_data"] = {}
+
+    plate_data = st.session_state[f"{key_prefix}_plate_data"]
+
+    rows = list("ABCDEFGHIJKLMNOP")
+    cols = list(range(1, 25))
+
+    grid_data = []
+    for row in rows:
+        row_data = {"Well": row}
+        for col in cols:
+            well = f"{row}{col}"
+            row_data[str(col)] = plate_data.get(well, "")
+        grid_data.append(row_data)
+
+    columns = ["Well"] + [str(c) for c in cols]
+
+    edited = st.data_editor(
+        grid_data,
+        column_config={
+            "Well": st.column_config.TextColumn("Row", width="small", disabled=True),
+            **{str(c): st.column_config.TextColumn(str(c), width="small") for c in cols},
+        },
+        hide_index=True,
+        num_rows="fixed",
+        key=f"{key_prefix}_editor",
+        use_container_width=True,
+    )
+
+    new_plate_data = {}
+    for row in rows:
+        for col in cols:
+            well = f"{row}{col}"
+            value = edited[rows.index(row)].get(str(col), "")
+            if value and value.strip():
+                new_plate_data[well] = value.strip()
+
+    if new_plate_data != plate_data:
+        st.session_state[f"{key_prefix}_plate_data"] = new_plate_data
+
+    return new_plate_data
+
+
+def parse_manual_plate_data(plate_data: dict) -> dict[str, tuple[str, int]]:
+    """Parse user-entered plate data into structured format."""
+    result = {}
+    for well, entry in plate_data.items():
+        entry = entry.strip()
+        if not entry:
+            continue
+        if ":" in entry:
+            parts = entry.split(":", 1)
+            substance = parts[0].strip()
+            try:
+                volume = int(parts[1].strip().rstrip("nL").strip())
+                result[well] = (substance, volume)
+            except (ValueError, IndexError):
+                pass
+    return result
 
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
@@ -279,83 +353,30 @@ def main():
 
     st.title("🔬 Echo Protocol")
     st.markdown(
-        "Set up the preprocessing workflow, choose whether you are reusing a premade plate or "
-        "building a new one, review the paired reference workflow if you have a sample plate, and "
-        "then run the experiment to validate the generated protocol."
+        "Generate Beckman Echo liquid handler protocols without writing code. "
+        "Define your source plate and experiment parameters, then export ready-to-run CSV transfer files."
     )
-
-    setup_col1, setup_col2 = st.columns(2)
-    with setup_col1:
-        st.success(
-            "**Fixed Workflow**\n\n"
-            "This screen is now focused on a single preprocessing workflow: "
-            f"`{WORKFLOW_NAME}`."
-        )
-    with setup_col2:
-        st.info(
-            "**Main Decision**\n\n"
-            "Tell the app whether you already have a premade plate or need to create a new one "
-            "from scratch."
-        )
+    st.caption("💡 Tip: Use a premade plate for quick experiments, or define a new plate manually for custom layouts.")
 
     uploaded_values = DEFAULT_CONFIG.copy()
     source_plate_paths = get_source_plate_map_paths()
     source_plate_options = [path.name for path in source_plate_paths]
 
-    st.subheader("Workflow Setup")
-    st.caption(f"Target workflow: `{WORKFLOW_NAME}`")
-    workflow_col1, workflow_col2 = st.columns([1.2, 1])
-    with workflow_col1:
-        plate_mode = st.radio(
-            "Plate starting point",
-            [PLATE_MODE_PREMADE, PLATE_MODE_NEW],
-            help="Choose whether the run should start from an existing prepared plate or build a new source plate layout.",
-        )
-
-    with workflow_col2:
-        if plate_mode == PLATE_MODE_PREMADE:
-            if source_plate_options:
-                selected_plate_name = st.selectbox(
-                    "Premade plate to use",
-                    source_plate_options,
-                    help="Choose which committed plate layout best matches the premade plate you want to run.",
-                )
-            else:
-                selected_plate_name = None
-                st.warning("No premade source plate CSVs are available in `data/raw`.")
-        else:
-            selected_plate_name = None
-            new_plate_name = st.text_input(
-                "New plate label",
-                value="new_source_plate",
-                help="A short label for the new plate you want the preprocessing step to build.",
-            )
-            st.caption(
-                "Use the parameter form below to describe the new run. The preprocessing workflow "
-                "should eventually build both the protocol CSV and the companion visualization CSVs."
-            )
-
-    st.subheader("Experiment Parameters")
-    st.caption(f"Fixed workflow notebook: `{WORKFLOW_NAME}`")
-    st.info(
-        "For now, this product is assuming a single preprocessing notebook fed by form inputs and "
-        "the plate mode above, instead of asking the user to choose among multiple notebooks."
-    )
-
+    st.subheader("1. Experiment Parameters")
     col1, col2 = st.columns(2)
 
     with col1:
         experiment_name = st.text_input(
             "Experiment Name",
             value=uploaded_values["experiment_name"],
-            help="Used in output filenames once notebook execution is wired up.",
+            help="Used in output filenames.",
         )
         doses = st.number_input(
             "Number of Doses",
             min_value=1,
             max_value=24,
             value=uploaded_values["doses"],
-            help="Number of points in the main dose curve.",
+            help="Number of doses per sample.",
         )
         doses2 = st.number_input(
             "Number of Doses (Second Curve)",
@@ -375,18 +396,18 @@ def main():
 
     with col2:
         vol_cellextract = st.number_input(
-            "Cell Extract Volume (nL)",
+            "Sample Volume (nL)",
             min_value=1,
             max_value=100000,
             value=uploaded_values["vol_cellextract"],
-            help="Volume of cell extract per well in nanoliters.",
+            help="Volume of sample to transfer to each destination well.",
         )
         vol_antigen = st.number_input(
-            "Antigen Volume (nL)",
-            min_value=1,
+            "Reagent Volume (nL)",
+            min_value=0,
             max_value=100000,
             value=uploaded_values["vol_antigen"],
-            help="Volume of antigen per well in nanoliters.",
+            help="Volume of reagent (antigen/PBS) to transfer.",
         )
         samples = st.text_input(
             "Sample Names",
@@ -394,66 +415,101 @@ def main():
             help="Comma-separated list of sample names.",
         )
 
-    st.divider()
-    st.subheader("Reference Workflow Preview")
-    if plate_mode == PLATE_MODE_PREMADE and selected_plate_name:
-        st.caption(
-            "This paired reference view shows the selected premade source plate and the historical "
-            "protocol it should produce. Use it to understand the workflow before you run the current experiment."
+    st.subheader("2. Plate Setup")
+    workflow_col1, workflow_col2 = st.columns([1.2, 1])
+    with workflow_col1:
+        plate_mode = st.radio(
+            "Plate source",
+            [PLATE_MODE_PREMADE, PLATE_MODE_MANUAL],
+            help="Choose an existing plate or define manually.",
         )
 
-        selected_source_path = next((path for path in source_plate_paths if path.name == selected_plate_name), None)
-        try:
-            _, selected_protocol_path = build_fixture_pair(selected_plate_name)
-        except (FileNotFoundError, FileExistsError) as exc:
-            selected_protocol_path = None
-            st.warning(str(exc))
+    with workflow_col2:
+        if plate_mode == PLATE_MODE_PREMADE:
+            selected_plate_name = None
+            new_plate_name = None
+            if source_plate_options:
+                selected_plate_name = st.selectbox(
+                    "Premade plate",
+                    source_plate_options,
+                    help="Choose a committed plate layout.",
+                )
+            else:
+                st.warning("No premade source plates available.")
+        else:
+            selected_plate_name = None
+            new_plate_name = None
 
-        render_setup_summary(
-            st,
-            "Reference Setup",
-            build_setup_summary_rows(
-                plate_mode=plate_mode,
-                experiment_name=experiment_name,
-                premade_plate_name=selected_plate_name,
-                doses=doses,
-                doses2=doses2,
-                highest_dose=highest_dose,
-                vol_cellextract=vol_cellextract,
-                vol_antigen=vol_antigen,
-                samples=samples,
-            ),
-            caption="These are the current run inputs for the selected premade workflow.",
+    if plate_mode == PLATE_MODE_MANUAL:
+        st.subheader("3. Define Source Plate")
+        st.markdown(
+            "Enter substances and volumes for each well. Format: `name: volume` "
+            "(e.g., `sample1: 60000`). Common: `sample1`, `sample2`, `antigen`, `PBS`."
         )
-
-        if selected_source_path and selected_protocol_path:
-            render_source_plate_panel(st, selected_source_path, "Reference Source Plate")
-            st.markdown("**Reference Validation Output**")
-            render_protocol_panel(st, selected_protocol_path, "Historical Protocol Output")
-        elif selected_source_path:
-            render_source_plate_panel(st, selected_source_path, "Reference Source Plate")
-    elif plate_mode == PLATE_MODE_PREMADE:
-        st.info("Select a premade plate to see the paired source-plate and reference-protocol preview.")
+        manual_plate_data = render_manual_plate_editor(st, "manual")
+        parsed_manual_plate = parse_manual_plate_data(manual_plate_data)
     else:
-        st.info(
-            "Reference source/protocol previews are available for the committed premade plate cases. "
-            "Generated outputs for new plates will appear after the workflow runs."
-        )
+        parsed_manual_plate = None
 
     st.divider()
-    st.subheader("Open Workflow Questions")
-    st.markdown(
-        "\n".join(
-            [
-                "1. If the user chooses a premade plate, what information do they need to specify besides the plate itself: experiment type, sample list, concentrations, replicate pattern, or destination layout?",
-                "2. If the user chooses to create a new plate from scratch, what are the minimum inputs required to build that plate correctly without opening the notebook?",
-                "3. Beyond the reference source plate and setup summary, what else should be previewed before a run?",
-                "4. Which errors or warnings would be most valuable to catch automatically before a grad student sends the protocol to the robot?",
-                "5. For repeated experiments, would users prefer to clone a previous run, start from a saved preset, or reuse a premade plate with just a few parameter changes?",
-                "6. What would make this feel like a trustworthy lab product rather than a notebook wrapper: guided steps, plain-language labels, audit trails, downloadable summaries, or stronger validation?",
-            ]
+    with st.expander("Reference Workflow Preview", expanded=False):
+        if plate_mode == PLATE_MODE_PREMADE and selected_plate_name:
+            st.caption(
+                "This paired reference view shows the selected premade source plate and the historical "
+                "protocol it should produce. Use it to understand the workflow before you run the current experiment."
+            )
+
+            selected_source_path = next((path for path in source_plate_paths if path.name == selected_plate_name), None)
+            try:
+                _, selected_protocol_path = build_fixture_pair(selected_plate_name)
+            except (FileNotFoundError, FileExistsError) as exc:
+                selected_protocol_path = None
+                st.warning(str(exc))
+
+            render_setup_summary(
+                st,
+                "Reference Setup",
+                build_setup_summary_rows(
+                    plate_mode=plate_mode,
+                    experiment_name=experiment_name,
+                    premade_plate_name=selected_plate_name,
+                    doses=doses,
+                    doses2=doses2,
+                    highest_dose=highest_dose,
+                    vol_cellextract=vol_cellextract,
+                    vol_antigen=vol_antigen,
+                    samples=samples,
+                ),
+                caption="These are the current run inputs for the selected premade workflow.",
+            )
+
+            if selected_source_path and selected_protocol_path:
+                render_source_plate_panel(st, selected_source_path, "Reference Source Plate")
+                st.markdown("**Reference Validation Output**")
+                render_protocol_panel(st, selected_protocol_path, "Historical Protocol Output")
+            elif selected_source_path:
+                render_source_plate_panel(st, selected_source_path, "Reference Source Plate")
+        elif plate_mode == PLATE_MODE_PREMADE:
+            st.info("Select a premade plate to see the paired source-plate and reference-protocol preview.")
+        else:
+            st.info(
+                "Reference source/protocol previews are available for the committed premade plate cases. "
+                "Generated outputs for new plates will appear after the workflow runs."
+            )
+
+    with st.expander("Open Workflow Questions", expanded=False):
+        st.markdown(
+            "\n".join(
+                [
+                    "1. If the user chooses a premade plate, what information do they need to specify besides the plate itself: experiment type, sample list, concentrations, replicate pattern, or destination layout?",
+                    "2. If the user chooses to create a new plate from scratch, what are the minimum inputs required to build that plate correctly without opening the notebook?",
+                    "3. Beyond the reference source plate and setup summary, what else should be previewed before a run?",
+                    "4. Which errors or warnings would be most valuable to catch automatically before a grad student sends the protocol to the robot?",
+                    "5. For repeated experiments, would users prefer to clone a previous run, start from a saved preset, or reuse a premade plate with just a few parameter changes?",
+                    "6. What would make this feel like a trustworthy lab product rather than a notebook wrapper: guided steps, plain-language labels, audit trails, downloadable summaries, or stronger validation?",
+                ]
+            )
         )
-    )
 
     st.divider()
     col1, col2, col3 = st.columns([1, 1, 1])
@@ -466,13 +522,17 @@ def main():
     if generate_btn:
         if plate_mode == PLATE_MODE_PREMADE and not selected_plate_name:
             st.error("❌ Select a premade plate before running the workflow.")
+        elif plate_mode == PLATE_MODE_MANUAL and not parsed_manual_plate:
+            st.error("❌ Define at least one well in the source plate before running.")
         else:
             st.info(f"📋 Running workflow: {WORKFLOW_NAME}")
             st.info(f"Plate mode: {plate_mode}")
             if plate_mode == PLATE_MODE_PREMADE:
                 st.info(f"Selected premade plate: {selected_plate_name}")
-            else:
+            elif plate_mode == PLATE_MODE_NEW:
                 st.info(f"New plate label: {new_plate_name}")
+            else:
+                st.info(f"Defined wells: {len(parsed_manual_plate)}")
 
             request = PreprocessingRequest(
                 experiment_name=experiment_name,
@@ -485,6 +545,7 @@ def main():
                 vol_cellextract=vol_cellextract,
                 vol_antigen=vol_antigen,
                 samples=parse_samples(samples),
+                manual_source_plate=parsed_manual_plate if plate_mode == PLATE_MODE_MANUAL else None,
             )
 
             try:

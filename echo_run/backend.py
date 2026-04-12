@@ -24,6 +24,60 @@ def get_data_dir() -> Path:
     """Return the configured data directory."""
     return Path(os.environ.get("ECHO_DATA_DIR", PROJECT_ROOT / "data"))
 
+
+def suggest_source_plate_layout(
+    samples: list[str],
+    doses: int,
+    doses2: int,
+    vol_cellextract: int,
+    vol_antigen: int,
+) -> dict[str, str]:
+    """Generate a recommended source plate layout based on experiment parameters."""
+    plate: dict[str, str] = {}
+
+    rows = list("ABCDEFGHIJKLMNOP")
+    cols = list(range(1, 25))
+
+    sample_cols = min(len(samples), 12)
+    for col_idx in range(sample_cols):
+        col = cols[col_idx]
+        sample_name = samples[col_idx]
+        for row_idx in range(6):
+            row = rows[row_idx]
+            well = f"{row}{col}"
+            plate[well] = f"{sample_name}: {vol_cellextract}nL"
+
+    if doses2 > 0:
+        antigen_row_idx = 8
+        antigen_wells_needed = min(doses + doses2, 12)
+        for col_idx in range(antigen_wells_needed):
+            if antigen_row_idx < len(rows):
+                row = rows[antigen_row_idx]
+                well = f"{row}{cols[col_idx]}"
+                if col_idx < doses:
+                    plate[well] = f"antigen: {vol_antigen}nL"
+                else:
+                    plate[well] = f"antigen2: {vol_antigen}nL"
+
+        pbs_row_idx = 8
+        pbs_cols_needed = max(doses, doses2)
+        for col_idx in range(pbs_cols_needed):
+            row = rows[pbs_row_idx]
+            well = f"{row}{cols[col_idx + doses]}"
+            if well not in plate:
+                plate[well] = f"PBS: {vol_antigen}nL"
+
+    elif vol_antigen > 0:
+        pbs_row_idx = 8
+        for col_idx in range(doses):
+            row = rows[pbs_row_idx]
+            well = f"{row}{cols[col_idx]}"
+            if well not in plate:
+                plate[well] = f"PBS: {vol_antigen}nL"
+
+    return plate
+
+
 DEFAULT_CONFIG = {
     "experiment_name": "my_experiment",
     "doses": 6,
@@ -98,9 +152,16 @@ def parse_config_text(config_text: str) -> tuple[dict[str, object], str | None]:
     return values, config_items.get("notebook")
 
 
-def parse_uploaded_config(uploaded_file: BinaryIO) -> tuple[dict[str, object], str | None]:
+def parse_uploaded_config(
+    uploaded_file: BinaryIO,
+) -> tuple[dict[str, object], str | None]:
     """Return normalized config values from a Streamlit-uploaded file."""
-    return parse_config_text(uploaded_file.getvalue().decode("utf-8"))
+    content = (
+        uploaded_file.getvalue()
+        if hasattr(uploaded_file, "getvalue")
+        else uploaded_file.read()
+    )
+    return parse_config_text(content.decode("utf-8"))
 
 
 def list_data_files(data_dir: Path | None = None) -> list[str]:
@@ -109,7 +170,11 @@ def list_data_files(data_dir: Path | None = None) -> list[str]:
         data_dir = get_data_dir()
     if not data_dir.exists():
         return []
-    return sorted(str(path.relative_to(PROJECT_ROOT)) for path in data_dir.rglob("*") if path.is_file())
+    return sorted(
+        str(path.relative_to(PROJECT_ROOT))
+        for path in data_dir.rglob("*")
+        if path.is_file()
+    )
 
 
 def get_source_plate_map_paths(data_dir: Path | None = None) -> list[Path]:
@@ -166,7 +231,9 @@ def build_source_plate_summary(plate_map):
     import pandas as pd
 
     summary_rows: list[dict[str, object]] = []
-    grouped: dict[str, dict[str, int]] = defaultdict(lambda: {"wells": 0, "total_volume_nl": 0, "max_volume_nl": 0})
+    grouped: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"wells": 0, "total_volume_nl": 0, "max_volume_nl": 0}
+    )
 
     occupied_wells = 0
     max_volume = 0
@@ -180,7 +247,9 @@ def build_source_plate_summary(plate_map):
             grouped[substance]["wells"] += 1
             if volume is not None:
                 grouped[substance]["total_volume_nl"] += volume
-                grouped[substance]["max_volume_nl"] = max(grouped[substance]["max_volume_nl"], volume)
+                grouped[substance]["max_volume_nl"] = max(
+                    grouped[substance]["max_volume_nl"], volume
+                )
                 max_volume = max(max_volume, volume)
 
     for substance in sorted(grouped):
@@ -243,10 +312,9 @@ def build_destination_composition_grid(protocol_df):
     component_count_rows: dict[str, dict[int, int]] = defaultdict(dict)
     max_components = 0
 
-    grouped = (
-        protocol_df.groupby(["Destination Well", "Sample Name", "Source Well"], as_index=False)
-        .agg(total_volume_nl=("Transfer Volume", "sum"))
-    )
+    grouped = protocol_df.groupby(
+        ["Destination Well", "Sample Name", "Source Well"], as_index=False
+    ).agg(total_volume_nl=("Transfer Volume", "sum"))
 
     for destination_well, sub_df in grouped.groupby("Destination Well"):
         match = WELL_PATTERN.match(str(destination_well))
@@ -255,10 +323,14 @@ def build_destination_composition_grid(protocol_df):
 
         row_label = match.group("row")
         column_label = int(match.group("column"))
-        ordered = sub_df.sort_values(["total_volume_nl", "Sample Name"], ascending=[False, True])
+        ordered = sub_df.sort_values(
+            ["total_volume_nl", "Sample Name"], ascending=[False, True]
+        )
         lines = [
             f"{sample}@{source}: {volume:,} nL"
-            for sample, source, volume in ordered[["Sample Name", "Source Well", "total_volume_nl"]].itertuples(index=False, name=None)
+            for sample, source, volume in ordered[
+                ["Sample Name", "Source Well", "total_volume_nl"]
+            ].itertuples(index=False, name=None)
         ]
 
         composition_rows[row_label][column_label] = "\n".join(lines)
@@ -269,10 +341,16 @@ def build_destination_composition_grid(protocol_df):
         return pd.DataFrame(), pd.DataFrame(), 0
 
     sorted_rows = sorted(composition_rows)
-    sorted_columns = sorted({column for row in composition_rows.values() for column in row})
+    sorted_columns = sorted(
+        {column for row in composition_rows.values() for column in row}
+    )
 
-    composition_grid = pd.DataFrame(index=sorted_rows, columns=sorted_columns).fillna("")
-    component_count_grid = pd.DataFrame(index=sorted_rows, columns=sorted_columns).fillna(0)
+    composition_grid = pd.DataFrame(index=sorted_rows, columns=sorted_columns).fillna(
+        ""
+    )
+    component_count_grid = pd.DataFrame(
+        index=sorted_rows, columns=sorted_columns
+    ).fillna(0)
 
     for row_label, columns in composition_rows.items():
         for column_label, value in columns.items():
@@ -287,11 +365,12 @@ def build_destination_composition_grid(protocol_df):
 
 def build_echo_protocol_summary(protocol_df):
     """Summarize committed Echo protocol CSVs for UI inspection."""
-    import pandas as pd
 
-    destination_composition_grid, destination_component_count_grid, destination_max_components = build_destination_composition_grid(
-        protocol_df
-    )
+    (
+        destination_composition_grid,
+        destination_component_count_grid,
+        destination_max_components,
+    ) = build_destination_composition_grid(protocol_df)
     destination_count_grid, _ = build_well_metric_grid(
         protocol_df.assign(transfer_count=1),
         "Destination Well",
@@ -340,7 +419,9 @@ def build_sanity_report(
     if data_dir is None:
         data_dir = get_data_dir()
 
-    config_values, selected_notebook = parse_config_text(config_path.read_text(encoding="utf-8"))
+    config_values, selected_notebook = parse_config_text(
+        config_path.read_text(encoding="utf-8")
+    )
     return SanityReport(
         notebooks=get_notebooks(notebooks_dir),
         data_files=list_data_files(data_dir),

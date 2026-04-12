@@ -7,8 +7,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import pandas as pd
-
 from echo_run.preprocessing import (
     PLATE_MODE_NEW,
     PLATE_MODE_PREMADE,
@@ -41,7 +39,9 @@ PREMADE_PLATE_CASES = {
 
 
 class PreprocessingRunnerTests(unittest.TestCase):
-    def assert_premade_plate_case_uses_notebook_workflow(self, case: PremadePlateCase) -> None:
+    def assert_premade_plate_case_uses_notebook_workflow(
+        self, case: PremadePlateCase
+    ) -> None:
         request = PreprocessingRequest(
             experiment_name=case.experiment_name,
             plate_mode=PLATE_MODE_PREMADE,
@@ -60,14 +60,20 @@ class PreprocessingRunnerTests(unittest.TestCase):
 
             self.assertEqual(result.execution_mode, "notebook")
             self.assertTrue(result.protocol_csv and result.protocol_csv.exists())
-            self.assertTrue(result.source_plate_csv and result.source_plate_csv.exists())
+            self.assertTrue(
+                result.source_plate_csv and result.source_plate_csv.exists()
+            )
             self.assertTrue(result.notebook_output_path.exists())
 
     def test_library_plate_a_runs_via_notebook(self) -> None:
-        self.assert_premade_plate_case_uses_notebook_workflow(PREMADE_PLATE_CASES["library_plate_a"])
+        self.assert_premade_plate_case_uses_notebook_workflow(
+            PREMADE_PLATE_CASES["library_plate_a"]
+        )
 
     def test_library_plate_b_runs_via_notebook(self) -> None:
-        self.assert_premade_plate_case_uses_notebook_workflow(PREMADE_PLATE_CASES["library_plate_b"])
+        self.assert_premade_plate_case_uses_notebook_workflow(
+            PREMADE_PLATE_CASES["library_plate_b"]
+        )
 
     def test_new_plate_from_scratch_runs_via_notebook(self) -> None:
         request = PreprocessingRequest(
@@ -88,7 +94,9 @@ class PreprocessingRunnerTests(unittest.TestCase):
 
             self.assertEqual(result.execution_mode, "notebook")
             self.assertTrue(result.protocol_csv and result.protocol_csv.exists())
-            self.assertTrue(result.source_plate_csv and result.source_plate_csv.exists())
+            self.assertTrue(
+                result.source_plate_csv and result.source_plate_csv.exists()
+            )
             self.assertTrue(result.notebook_output_path.exists())
 
 

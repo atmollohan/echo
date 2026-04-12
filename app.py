@@ -14,6 +14,7 @@ from echo_run.backend import (
     load_echo_protocol,
     load_source_plate_map,
     parse_plate_entry,
+    suggest_source_plate_layout,
 )
 from echo_run.preprocessing import (
     PLATE_MODE_NEW,
@@ -45,12 +46,19 @@ def get_plate_wells():
     return [f"{r}{c}" for r in rows for c in cols]
 
 
-def render_manual_plate_editor(st, key_prefix: str = "manual"):
+def render_manual_plate_editor(
+    st, key_prefix: str = "manual", initial_data: dict | None = None
+):
     """Render an editable 384-well plate grid using data editor."""
-    st.caption("Edit wells below. Format: `name: volume` (e.g., `sample1: 60000`). Empty = no data.")
+    st.caption(
+        "Edit wells below. Format: `name: volume` (e.g., `sample1: 60000`). Empty = no data."
+    )
 
     if f"{key_prefix}_plate_data" not in st.session_state:
-        st.session_state[f"{key_prefix}_plate_data"] = {}
+        if initial_data:
+            st.session_state[f"{key_prefix}_plate_data"] = initial_data
+        else:
+            st.session_state[f"{key_prefix}_plate_data"] = {}
 
     plate_data = st.session_state[f"{key_prefix}_plate_data"]
 
@@ -65,13 +73,13 @@ def render_manual_plate_editor(st, key_prefix: str = "manual"):
             row_data[str(col)] = plate_data.get(well, "")
         grid_data.append(row_data)
 
-    columns = ["Well"] + [str(c) for c in cols]
-
     edited = st.data_editor(
         grid_data,
         column_config={
             "Well": st.column_config.TextColumn("Row", width="small", disabled=True),
-            **{str(c): st.column_config.TextColumn(str(c), width="small") for c in cols},
+            **{
+                str(c): st.column_config.TextColumn(str(c), width="small") for c in cols
+            },
         },
         hide_index=True,
         num_rows="fixed",
@@ -142,15 +150,14 @@ def style_source_plate_map(plate_map, max_volume_nl: int, substances: list[str])
             "color: #0f172a; font-weight: 600;"
         )
 
-    return (
-        plate_map.style
-        .map(style_cell)
-        .set_properties(**{"text-align": "center", "white-space": "nowrap"})
+    return plate_map.style.map(style_cell).set_properties(
+        **{"text-align": "center", "white-space": "nowrap"}
     )
 
 
 def style_numeric_plate_grid(metric_grid, max_value: int, color: str):
     """Return a color-coded styler for numeric well metrics."""
+
     def style_cell(cell_value: object) -> str:
         value = int(cell_value)
         if value <= 0:
@@ -165,15 +172,17 @@ def style_numeric_plate_grid(metric_grid, max_value: int, color: str):
         )
 
     return (
-        metric_grid.style
-        .map(style_cell)
+        metric_grid.style.map(style_cell)
         .format("{:,.0f}")
         .set_properties(**{"text-align": "center", "white-space": "nowrap"})
     )
 
 
-def style_composition_plate_grid(composition_grid, component_count_grid, max_components: int):
+def style_composition_plate_grid(
+    composition_grid, component_count_grid, max_components: int
+):
     """Return a styled destination composition grid."""
+
     def style_cell(cell_value: object) -> str:
         if not str(cell_value).strip():
             return "background-color: #f8fafc; color: #94a3b8;"
@@ -196,10 +205,11 @@ def style_composition_plate_grid(composition_grid, component_count_grid, max_com
         return styles
 
     return (
-        composition_grid.style
-        .map(style_cell)
+        composition_grid.style.map(style_cell)
         .apply(style_from_counts, axis=0)
-        .set_properties(**{"white-space": "pre-line", "text-align": "left", "vertical-align": "top"})
+        .set_properties(
+            **{"white-space": "pre-line", "text-align": "left", "vertical-align": "top"}
+        )
     )
 
 
@@ -242,7 +252,9 @@ def build_setup_summary_rows(
     return rows
 
 
-def render_setup_summary(st, heading: str, rows: list[tuple[str, object]], caption: str | None = None):
+def render_setup_summary(
+    st, heading: str, rows: list[tuple[str, object]], caption: str | None = None
+):
     """Render a compact setup summary table."""
     st.markdown(f"**{heading}**")
     if caption:
@@ -250,7 +262,7 @@ def render_setup_summary(st, heading: str, rows: list[tuple[str, object]], capti
     st.table(
         {
             "Setting": [label for label, _value in rows],
-            "Value": [value for _label, value in rows],
+            "Value": [str(value) for _label, value in rows],
         }
     )
 
@@ -288,7 +300,9 @@ def render_source_plate_panel(st, source_plate_path, heading: str):
         width="stretch",
         height=560,
     )
-    st.caption("Cells are colored by substance. Darker fills indicate larger loaded volumes.")
+    st.caption(
+        "Cells are colored by substance. Darker fills indicate larger loaded volumes."
+    )
 
 
 def render_protocol_panel(st, protocol_path, heading: str):
@@ -307,7 +321,9 @@ def render_protocol_panel(st, protocol_path, heading: str):
     with metric_col4:
         st.metric("Destination Wells Used", summary["destination_well_count"])
 
-    st.caption(f"Total transferred volume in this protocol: {summary['total_transfer_volume_nl']:,} nL")
+    st.caption(
+        f"Total transferred volume in this protocol: {summary['total_transfer_volume_nl']:,} nL"
+    )
 
     st.markdown("**Destination well composition**")
     st.dataframe(
@@ -319,7 +335,9 @@ def render_protocol_panel(st, protocol_path, heading: str):
         width="stretch",
         height=420,
     )
-    st.caption("Each cell shows which sample/source components contribute to that destination well.")
+    st.caption(
+        "Each cell shows which sample/source components contribute to that destination well."
+    )
 
     max_transfer_count = 0
     if not summary["destination_count_grid"].empty:
@@ -334,7 +352,9 @@ def render_protocol_panel(st, protocol_path, heading: str):
         width="stretch",
         height=420,
     )
-    st.caption("This view shows how many individual transfers landed in each destination well.")
+    st.caption(
+        "This view shows how many individual transfers landed in each destination well."
+    )
 
     st.info(
         "Use the destination composition map to see what each well contains, and the transfer-count "
@@ -356,13 +376,93 @@ def main():
         "Generate Beckman Echo liquid handler protocols without writing code. "
         "Define your source plate and experiment parameters, then export ready-to-run CSV transfer files."
     )
-    st.caption("💡 Tip: Use a premade plate for quick experiments, or define a new plate manually for custom layouts.")
+    st.caption(
+        "💡 Tip: Use a premade plate for quick experiments, or define a new plate manually for custom layouts."
+    )
 
-    uploaded_values = DEFAULT_CONFIG.copy()
     source_plate_paths = get_source_plate_map_paths()
     source_plate_options = [path.name for path in source_plate_paths]
 
-    st.subheader("1. Experiment Parameters")
+    st.subheader("1. Choose Your Plate")
+
+    st.markdown("**How would you like to set up your source plate?**")
+    plate_col1, plate_col2 = st.columns(2)
+
+    with plate_col1:
+        st.info("📋 **Use a Premade Plate**")
+        st.caption("Start with a previously used plate layout as reference")
+    with plate_col2:
+        st.info("🆕 **Create a New Plate**")
+        st.caption("Define your own custom plate layout from scratch")
+
+    plate_mode = st.segmented_control(
+        "Plate Source",
+        {"premade": "📋 Premade Plate", "manual": "🆕 New Plate"},
+        default="manual",
+        help="Choose an existing plate or define manually.",
+    )
+
+    if plate_mode == "premade":
+        plate_mode = PLATE_MODE_PREMADE
+    else:
+        plate_mode = PLATE_MODE_MANUAL
+
+    if plate_mode == PLATE_MODE_PREMADE:
+        if source_plate_options:
+            selected_plate_name = st.selectbox(
+                "Select a premade plate to use",
+                source_plate_options,
+                help="Choose a committed plate layout.",
+            )
+        else:
+            st.warning("No premade source plates available.")
+            selected_plate_name = None
+    else:
+        selected_plate_name = None
+
+    new_plate_name = None
+
+    if plate_mode == PLATE_MODE_PREMADE and selected_plate_name:
+        try:
+            selected_source_path, selected_protocol_path = build_fixture_pair(
+                selected_plate_name
+            )
+
+            source_plate_map = load_source_plate_map(selected_source_path)
+            source_summary = build_source_plate_summary(source_plate_map)
+
+            st.markdown("### 📋 Selected Plate Details")
+
+            param_col1, param_col2, param_col3 = st.columns(3)
+            with param_col1:
+                st.metric("Occupied Wells", source_summary["occupied_wells"])
+            with param_col2:
+                st.metric("Substances", len(source_summary["substances"]))
+            with param_col3:
+                st.metric("Empty Wells", source_summary["empty_wells"])
+
+            st.markdown("**Substances on this plate:**")
+            for _, row in source_summary["summary_table"].iterrows():
+                st.caption(
+                    f"• {row['substance']}: {row['total_volume_nl']:,} nL across {row['wells']} wells"
+                )
+
+            with st.expander("View Source Plate Map", expanded=True):
+                render_source_plate_panel(
+                    st, selected_source_path, "Source Plate Layout"
+                )
+
+            with st.expander("View Reference Protocol", expanded=False):
+                render_protocol_panel(st, selected_protocol_path, "Historical Protocol")
+
+        except (FileNotFoundError, FileExistsError) as exc:
+            st.warning(str(exc))
+
+    st.divider()
+    st.subheader("2. Experiment Parameters")
+
+    uploaded_values = DEFAULT_CONFIG.copy()
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -415,106 +515,49 @@ def main():
             help="Comma-separated list of sample names.",
         )
 
-    st.subheader("2. Plate Setup")
-    workflow_col1, workflow_col2 = st.columns([1.2, 1])
-    with workflow_col1:
-        plate_mode = st.radio(
-            "Plate source",
-            [PLATE_MODE_PREMADE, PLATE_MODE_MANUAL],
-            help="Choose an existing plate or define manually.",
-        )
-
-    with workflow_col2:
-        if plate_mode == PLATE_MODE_PREMADE:
-            selected_plate_name = None
-            new_plate_name = None
-            if source_plate_options:
-                selected_plate_name = st.selectbox(
-                    "Premade plate",
-                    source_plate_options,
-                    help="Choose a committed plate layout.",
-                )
-            else:
-                st.warning("No premade source plates available.")
-        else:
-            selected_plate_name = None
-            new_plate_name = None
-
     if plate_mode == PLATE_MODE_MANUAL:
         st.subheader("3. Define Source Plate")
+
+        if "manual_suggestion_applied" not in st.session_state:
+            st.session_state.manual_suggestion_applied = False
+
+        sample_list = parse_samples(samples)
+        if sample_list and not st.session_state.manual_suggestion_applied:
+            suggested_layout = suggest_source_plate_layout(
+                sample_list, doses, doses2, vol_cellextract, vol_antigen
+            )
+            col_suggest, col_apply = st.columns([3, 1])
+            with col_suggest:
+                st.caption(f"💡 Suggested layout for {len(sample_list)} samples")
+            with col_apply:
+                if st.button("Apply Suggestion", key="apply_suggestion"):
+                    st.session_state["manual_plate_data"] = suggested_layout
+                    st.session_state["manual_suggestion_applied"] = True
+                    st.rerun()
+            initial_for_editor = None
+        else:
+            suggested_layout = None
+            initial_for_editor = st.session_state.get("manual_plate_data")
+
         st.markdown(
             "Enter substances and volumes for each well. Format: `name: volume` "
             "(e.g., `sample1: 60000`). Common: `sample1`, `sample2`, `antigen`, `PBS`."
         )
-        manual_plate_data = render_manual_plate_editor(st, "manual")
+
+        manual_plate_data = render_manual_plate_editor(st, "manual", initial_for_editor)
         parsed_manual_plate = parse_manual_plate_data(manual_plate_data)
     else:
         parsed_manual_plate = None
 
     st.divider()
-    with st.expander("Reference Workflow Preview", expanded=False):
-        if plate_mode == PLATE_MODE_PREMADE and selected_plate_name:
-            st.caption(
-                "This paired reference view shows the selected premade source plate and the historical "
-                "protocol it should produce. Use it to understand the workflow before you run the current experiment."
-            )
-
-            selected_source_path = next((path for path in source_plate_paths if path.name == selected_plate_name), None)
-            try:
-                _, selected_protocol_path = build_fixture_pair(selected_plate_name)
-            except (FileNotFoundError, FileExistsError) as exc:
-                selected_protocol_path = None
-                st.warning(str(exc))
-
-            render_setup_summary(
-                st,
-                "Reference Setup",
-                build_setup_summary_rows(
-                    plate_mode=plate_mode,
-                    experiment_name=experiment_name,
-                    premade_plate_name=selected_plate_name,
-                    doses=doses,
-                    doses2=doses2,
-                    highest_dose=highest_dose,
-                    vol_cellextract=vol_cellextract,
-                    vol_antigen=vol_antigen,
-                    samples=samples,
-                ),
-                caption="These are the current run inputs for the selected premade workflow.",
-            )
-
-            if selected_source_path and selected_protocol_path:
-                render_source_plate_panel(st, selected_source_path, "Reference Source Plate")
-                st.markdown("**Reference Validation Output**")
-                render_protocol_panel(st, selected_protocol_path, "Historical Protocol Output")
-            elif selected_source_path:
-                render_source_plate_panel(st, selected_source_path, "Reference Source Plate")
-        elif plate_mode == PLATE_MODE_PREMADE:
-            st.info("Select a premade plate to see the paired source-plate and reference-protocol preview.")
-        else:
-            st.info(
-                "Reference source/protocol previews are available for the committed premade plate cases. "
-                "Generated outputs for new plates will appear after the workflow runs."
-            )
-
-    with st.expander("Open Workflow Questions", expanded=False):
-        st.markdown(
-            "\n".join(
-                [
-                    "1. If the user chooses a premade plate, what information do they need to specify besides the plate itself: experiment type, sample list, concentrations, replicate pattern, or destination layout?",
-                    "2. If the user chooses to create a new plate from scratch, what are the minimum inputs required to build that plate correctly without opening the notebook?",
-                    "3. Beyond the reference source plate and setup summary, what else should be previewed before a run?",
-                    "4. Which errors or warnings would be most valuable to catch automatically before a grad student sends the protocol to the robot?",
-                    "5. For repeated experiments, would users prefer to clone a previous run, start from a saved preset, or reuse a premade plate with just a few parameter changes?",
-                    "6. What would make this feel like a trustworthy lab product rather than a notebook wrapper: guided steps, plain-language labels, audit trails, downloadable summaries, or stronger validation?",
-                ]
-            )
-        )
+    st.subheader("4. Run Protocol")
 
     st.divider()
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        generate_btn = st.button("🚀 Generate Protocol", type="primary", width="stretch")
+        generate_btn = st.button(
+            "🚀 Generate Protocol", type="primary", width="stretch"
+        )
 
     if "last_run_result" not in st.session_state:
         st.session_state["last_run_result"] = None
@@ -538,14 +581,18 @@ def main():
                 experiment_name=experiment_name,
                 plate_mode=plate_mode,
                 premade_plate_name=selected_plate_name,
-                new_plate_label=new_plate_name if plate_mode == PLATE_MODE_NEW else None,
+                new_plate_label=new_plate_name
+                if plate_mode == PLATE_MODE_NEW
+                else None,
                 doses=doses,
                 doses2=doses2,
                 highest_dose=highest_dose,
                 vol_cellextract=vol_cellextract,
                 vol_antigen=vol_antigen,
                 samples=parse_samples(samples),
-                manual_source_plate=parsed_manual_plate if plate_mode == PLATE_MODE_MANUAL else None,
+                manual_source_plate=parsed_manual_plate
+                if plate_mode == PLATE_MODE_MANUAL
+                else None,
             )
 
             try:
@@ -565,7 +612,9 @@ def main():
                     "experiment_name": experiment_name,
                     "plate_mode": plate_mode,
                     "premade_plate_name": selected_plate_name,
-                    "new_plate_label": new_plate_name if plate_mode == PLATE_MODE_NEW else None,
+                    "new_plate_label": new_plate_name
+                    if plate_mode == PLATE_MODE_NEW
+                    else None,
                     "doses": doses,
                     "doses2": doses2,
                     "highest_dose": highest_dose,
@@ -574,9 +623,17 @@ def main():
                     "samples": samples,
                     "execution_mode": result.execution_mode,
                     "output_dir": str(result.output_dir),
-                    "protocol_csv": str(result.protocol_csv) if result.protocol_csv else None,
-                    "destination_composition_csv": str(result.destination_composition_csv) if result.destination_composition_csv else None,
-                    "source_plate_csv": str(result.source_plate_csv) if result.source_plate_csv else None,
+                    "protocol_csv": str(result.protocol_csv)
+                    if result.protocol_csv
+                    else None,
+                    "destination_composition_csv": str(
+                        result.destination_composition_csv
+                    )
+                    if result.destination_composition_csv
+                    else None,
+                    "source_plate_csv": str(result.source_plate_csv)
+                    if result.source_plate_csv
+                    else None,
                     "run_manifest_json": str(result.run_manifest_json),
                 }
                 st.success("Preprocessing run completed.")
@@ -612,9 +669,13 @@ def main():
         generated_protocol = last_run_result.get("protocol_csv")
 
         if generated_source_plate and generated_protocol:
-            render_source_plate_panel(st, generated_source_plate, "Generated Source Plate")
+            render_source_plate_panel(
+                st, generated_source_plate, "Generated Source Plate"
+            )
             st.markdown("**Generated Validation Output**")
-            render_protocol_panel(st, generated_protocol, "Generated Protocol Validation Preview")
+            render_protocol_panel(
+                st, generated_protocol, "Generated Protocol Validation Preview"
+            )
         else:
             st.info(
                 "This run finished without both generated plate and protocol artifacts, so only the "
@@ -624,7 +685,10 @@ def main():
         st.markdown("**Download run artifacts**")
         output_files = [
             ("Echo Protocol CSV", last_run_result.get("protocol_csv")),
-            ("Destination Composition CSV", last_run_result.get("destination_composition_csv")),
+            (
+                "Destination Composition CSV",
+                last_run_result.get("destination_composition_csv"),
+            ),
             ("Source Plate CSV", last_run_result.get("source_plate_csv")),
             ("Run Manifest JSON", last_run_result.get("run_manifest_json")),
         ]

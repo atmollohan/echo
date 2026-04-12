@@ -264,7 +264,6 @@ def execute_manual_plate_workflow(
     output_dir: Path,
 ) -> PreprocessingResult:
     """Generate protocol from manually defined source plate."""
-    from echo_run.backend import load_echo_protocol
 
     experiment_slug = slugify_name(request.experiment_name)
 
@@ -272,6 +271,7 @@ def execute_manual_plate_workflow(
     plate_columns = list(range(1, 25))
 
     source_plate_df = pd.DataFrame(index=plate_rows, columns=plate_columns)
+    assert request.manual_source_plate is not None
     for well, (substance, volume) in request.manual_source_plate.items():
         row = well[0]
         col = int(well[1:])
@@ -283,6 +283,7 @@ def execute_manual_plate_workflow(
 
     # Build lookup: substance -> list of wells
     substance_wells: dict[str, list[str]] = {}
+    assert request.manual_source_plate is not None
     for well, (substance, volume) in request.manual_source_plate.items():
         if substance not in substance_wells:
             substance_wells[substance] = []

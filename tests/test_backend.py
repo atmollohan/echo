@@ -19,6 +19,7 @@ from echo_run.backend import (
     normalize_ini_text,
     parse_plate_entry,
     parse_config_text,
+    suggest_source_plate_layout,
 )
 
 
@@ -70,7 +71,9 @@ class RepoSanityTests(unittest.TestCase):
             (root / "also-keep-notebook.ipynb").write_text("", encoding="utf-8")
             (root / "skip-checkpoint-checkpoint.ipynb").write_text("", encoding="utf-8")
 
-            self.assertEqual(get_notebooks(root), ["also-keep-notebook.ipynb", "keep.ipynb"])
+            self.assertEqual(
+                get_notebooks(root), ["also-keep-notebook.ipynb", "keep.ipynb"]
+            )
 
     def test_build_sanity_report_matches_repo_shape(self) -> None:
         report = build_sanity_report()
@@ -107,7 +110,9 @@ class SourcePlateMapTests(unittest.TestCase):
         plate_paths = get_source_plate_map_paths()
 
         self.assertGreaterEqual(len(plate_paths), 1)
-        self.assertTrue(any(path.name.endswith("source_plateA.csv") for path in plate_paths))
+        self.assertTrue(
+            any(path.name.endswith("source_plateA.csv") for path in plate_paths)
+        )
 
 
 class EchoProtocolTests(unittest.TestCase):
@@ -115,7 +120,12 @@ class EchoProtocolTests(unittest.TestCase):
         protocol_paths = get_echo_protocol_paths()
 
         self.assertGreaterEqual(len(protocol_paths), 1)
-        self.assertTrue(any(path.name.endswith("echo_protocol_plateA.csv") for path in protocol_paths))
+        self.assertTrue(
+            any(
+                path.name.endswith("echo_protocol_plateA.csv")
+                for path in protocol_paths
+            )
+        )
 
     def test_echo_protocol_summary_builds_destination_and_source_views(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -139,10 +149,50 @@ class EchoProtocolTests(unittest.TestCase):
             self.assertEqual(summary["source_well_count"], 2)
             self.assertEqual(summary["destination_well_count"], 2)
             self.assertEqual(summary["total_transfer_volume_nl"], 450)
-            self.assertIn("S1@A1: 300 nL", summary["destination_composition_grid"].loc["A", 1])
-            self.assertEqual(int(summary["destination_component_count_grid"].loc["A", 1]), 1)
+            self.assertIn(
+                "S1@A1: 300 nL", summary["destination_composition_grid"].loc["A", 1]
+            )
+            self.assertEqual(
+                int(summary["destination_component_count_grid"].loc["A", 1]), 1
+            )
             self.assertEqual(int(summary["destination_count_grid"].loc["A", 1]), 2)
             self.assertEqual(int(summary["source_count_grid"].loc["A", 1]), 2)
+
+
+class SourcePlateSuggestionTests(unittest.TestCase):
+    def test_suggested_layout_includes_samples(self):
+        layout = suggest_source_plate_layout(
+            samples=["sample1", "sample2", "sample3"],
+            doses=6,
+            doses2=0,
+            vol_cellextract=2000,
+            vol_antigen=0,
+        )
+        self.assertEqual(layout["A1"], "sample1: 2000nL")
+        self.assertEqual(layout["B1"], "sample1: 2000nL")
+        self.assertEqual(layout["A2"], "sample2: 2000nL")
+
+    def test_suggested_layout_includes_antigen_when_doses2_present(self):
+        layout = suggest_source_plate_layout(
+            samples=["sample1"],
+            doses=3,
+            doses2=3,
+            vol_cellextract=2000,
+            vol_antigen=3000,
+        )
+        self.assertIn("antigen: 3000nL", layout["I1"])
+        self.assertIn("antigen2: 3000nL", layout["I4"])
+
+    def test_suggested_layout_includes_pbs(self):
+        layout = suggest_source_plate_layout(
+            samples=["sample1"],
+            doses=3,
+            doses2=0,
+            vol_cellextract=2000,
+            vol_antigen=2500,
+        )
+        self.assertIn("PBS: 2500nL", layout["I1"])
+        self.assertIn("PBS: 2500nL", layout["I2"])
 
 
 if __name__ == "__main__":

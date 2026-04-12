@@ -23,3 +23,13 @@ echo-protocol-generate = "echo_run.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["echo_run*"]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

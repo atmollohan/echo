@@ -35,6 +35,8 @@ No Python coding, no notebook editing, no complex setup required.
 - numpy - Numerical computing
 - pandas - Data manipulation/CSV processing
 - tqdm - Progress bars
+- papermill - Notebook execution
+- streamlit - Web UI
 ## Frameworks
 - Pandas - CSV reading/writing for lab equipment protocols
 - NumPy - Numerical operations for dose calculations

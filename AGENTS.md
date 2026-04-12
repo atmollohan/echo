@@ -154,4 +154,22 @@ notebook = library_plate_a_protocol.ipynb
 - Notebooks still rely heavily on hardcoded parameters and internal variant lists
 - Output format: Beckman Echo CSV (Source Well, Dest Well, Transfer Volume)
 - `data/raw/` contains historical source plate maps and Echo protocol CSVs for the library plate workflows
-- Validation layer coming in future phase
+
+## Development
+
+### Running Checks
+
+Before commits, always run:
+
+```bash
+# Linting
+ruff check echo_run/
+
+# Type checking
+mypy echo_run/ --ignore-missing-imports
+
+# Tests
+pytest
+```
+
+All three must pass before submitting changes.

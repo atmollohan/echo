@@ -41,15 +41,21 @@ def install_pandas_legacy_compat() -> None:
     setattr(pd.DataFrame, "append", _append)
 
 
-def iter_code_cells(notebook_path: Path) -> list[tuple[int, str]]:
-    """Return executable code cells from a notebook JSON document."""
+def iter_code_cells(notebook_path: Path) -> list[tuple[int, str, list[str]]]:
+    """Return executable code cells and metadata tags from a notebook JSON document."""
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
-    code_cells: list[tuple[int, str]] = []
+    code_cells: list[tuple[int, str, list[str]]] = []
 
     for index, cell in enumerate(notebook["cells"]):
         if cell.get("cell_type") != "code":
             continue
-        code_cells.append((index, "".join(cell.get("source", []))))
+        code_cells.append(
+            (
+                index,
+                "".join(cell.get("source", [])),
+                list(cell.get("metadata", {}).get("tags", [])),
+            )
+        )
 
     return code_cells
 
@@ -59,6 +65,7 @@ def execute_legacy_notebook(
     *,
     working_dir: Path | None = None,
     extra_namespace: dict[str, Any] | None = None,
+    parameter_overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute notebook code cells sequentially in-process.
 
@@ -80,7 +87,10 @@ def execute_legacy_notebook(
             os.chdir(working_dir)
 
         with contextlib.redirect_stdout(stdout):
-            for cell_index, source in iter_code_cells(notebook_path):
+            for cell_index, source, tags in iter_code_cells(notebook_path):
+                if parameter_overrides and "parameters" in tags:
+                    namespace.update(parameter_overrides)
+                    continue
                 exec(compile(source, f"{notebook_path.name}#cell{cell_index}", "exec"), namespace)
     finally:
         os.chdir(original_cwd)

@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from echo_run.backend import PROJECT_ROOT, load_echo_protocol
+from echo_run.legacy_notebook import execute_legacy_notebook
 
 WORKFLOW_NAME = "echo-protocol-preprocessing"
 PLATE_MODE_PREMADE = "Use a premade plate"
@@ -154,6 +155,46 @@ def write_run_manifest(output_dir: Path, request: PreprocessingRequest, executio
     return manifest_path
 
 
+def build_notebook_parameters(
+    request: PreprocessingRequest,
+    output_dir: Path,
+) -> dict[str, object]:
+    """Build the parameter payload shared by notebook execution backends."""
+    return {
+        "workflow_name": WORKFLOW_NAME,
+        "plate_mode": request.plate_mode,
+        "premade_plate_name": request.premade_plate_name,
+        "new_plate_label": request.new_plate_label,
+        "experiment_name": request.experiment_name,
+        "doses": request.doses,
+        "doses2": request.doses2,
+        "highest_dose": request.highest_dose,
+        "vol_cellextract": request.vol_cellextract,
+        "vol_antigen": request.vol_antigen,
+        "samples": request.samples,
+        "output_dir": str(output_dir),
+    }
+
+
+def ensure_destination_composition_csv(
+    protocol_path: Path | None,
+    output_dir: Path,
+    experiment_slug: str,
+) -> Path | None:
+    """Create the destination-composition CSV when a protocol CSV exists."""
+    if protocol_path is None or not protocol_path.exists():
+        return None
+
+    composition_path = output_dir / f"{experiment_slug}_destination_composition.csv"
+    if composition_path.exists():
+        return composition_path
+
+    protocol_df = load_echo_protocol(protocol_path)
+    composition_df = build_destination_composition_table(protocol_df)
+    composition_df.to_csv(composition_path, index=False)
+    return composition_path
+
+
 def materialize_fixture_outputs(request: PreprocessingRequest, output_dir: Path) -> PreprocessingResult:
     """Copy committed fixture CSVs into an output directory for validation and review."""
     assert request.premade_plate_name is not None
@@ -189,45 +230,47 @@ def execute_notebook_workflow(
     output_dir: Path,
     notebook_path: Path,
 ) -> PreprocessingResult:
-    """Run a parameterized preprocessing notebook via papermill."""
+    """Run a parameterized preprocessing notebook with a sandbox-safe fallback."""
+    experiment_slug = slugify_name(request.experiment_name)
+    notebook_output_path = output_dir / f"{experiment_slug}_preprocessing_output.ipynb"
+    parameters = build_notebook_parameters(request, output_dir)
+    execution_mode = "notebook"
+
     try:
         import papermill as pm
-    except ModuleNotFoundError as exc:
-        raise RuntimeError("Papermill is required to execute the preprocessing notebook.") from exc
 
-    notebook_output_path = output_dir / f"{slugify_name(request.experiment_name)}_preprocessing_output.ipynb"
-    parameters = {
-        "workflow_name": WORKFLOW_NAME,
-        "plate_mode": request.plate_mode,
-        "premade_plate_name": request.premade_plate_name,
-        "new_plate_label": request.new_plate_label,
-        "experiment_name": request.experiment_name,
-        "doses": request.doses,
-        "doses2": request.doses2,
-        "highest_dose": request.highest_dose,
-        "vol_cellextract": request.vol_cellextract,
-        "vol_antigen": request.vol_antigen,
-        "samples": request.samples,
-        "output_dir": str(output_dir),
-    }
-    pm.execute_notebook(
-        str(notebook_path),
-        str(notebook_output_path),
-        parameters=parameters,
+        pm.execute_notebook(
+            str(notebook_path),
+            str(notebook_output_path),
+            parameters=parameters,
+        )
+    except (ModuleNotFoundError, PermissionError, OSError):
+        # Some CI and sandboxed environments block kernel startup. These
+        # notebooks are plain Python, so we can still execute them in-process.
+        execute_legacy_notebook(
+            notebook_path,
+            working_dir=output_dir,
+            parameter_overrides=parameters,
+        )
+        shutil.copyfile(notebook_path, notebook_output_path)
+        execution_mode = "notebook_in_process"
+
+    protocol_path = output_dir / f"{experiment_slug}_echo_protocol.csv"
+    source_plate_path = output_dir / f"{experiment_slug}_source_plate.csv"
+    composition_path = ensure_destination_composition_csv(
+        protocol_path if protocol_path.exists() else None,
+        output_dir,
+        experiment_slug,
     )
-
-    manifest_path = write_run_manifest(output_dir, request, execution_mode="notebook")
-    protocol_path = output_dir / f"{slugify_name(request.experiment_name)}_echo_protocol.csv"
-    source_plate_path = output_dir / f"{slugify_name(request.experiment_name)}_source_plate.csv"
-    composition_path = output_dir / f"{slugify_name(request.experiment_name)}_destination_composition.csv"
+    manifest_path = write_run_manifest(output_dir, request, execution_mode=execution_mode)
 
     return PreprocessingResult(
         workflow_name=WORKFLOW_NAME,
-        execution_mode="notebook",
+        execution_mode=execution_mode,
         output_dir=output_dir,
         protocol_csv=protocol_path if protocol_path.exists() else None,
         source_plate_csv=source_plate_path if source_plate_path.exists() else None,
-        destination_composition_csv=composition_path if composition_path.exists() else None,
+        destination_composition_csv=composition_path,
         run_manifest_json=manifest_path,
         notebook_output_path=notebook_output_path,
     )
@@ -242,9 +285,18 @@ def run_echo_protocol_preprocessing(
     target_dir = output_dir or (get_output_dir() / slugify_name(request.experiment_name))
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Manual plate mode uses custom logic, not the notebook
-    if request.plate_mode == PLATE_MODE_MANUAL and request.manual_source_plate:
-        return execute_manual_plate_workflow(request, target_dir)
+    # Editable source plate runs use the Python workflow directly.
+    if request.manual_source_plate:
+        execution_mode = (
+            "manual_plate"
+            if request.plate_mode == PLATE_MODE_MANUAL
+            else "premade_customized"
+        )
+        return execute_manual_plate_workflow(
+            request,
+            target_dir,
+            execution_mode=execution_mode,
+        )
 
     notebook_path = workflow_notebook_path or get_workflow_notebook_path()
     if notebook_path and notebook_path.exists():
@@ -262,6 +314,8 @@ def run_echo_protocol_preprocessing(
 def execute_manual_plate_workflow(
     request: PreprocessingRequest,
     output_dir: Path,
+    *,
+    execution_mode: str = "manual_plate",
 ) -> PreprocessingResult:
     """Generate protocol from manually defined source plate."""
 
@@ -340,11 +394,15 @@ def execute_manual_plate_workflow(
     composition_path = output_dir / f"{experiment_slug}_destination_composition.csv"
     composition_df.to_csv(composition_path, index=False)
 
-    manifest_path = write_run_manifest(output_dir, request, execution_mode="manual_plate")
+    manifest_path = write_run_manifest(
+        output_dir,
+        request,
+        execution_mode=execution_mode,
+    )
 
     return PreprocessingResult(
         workflow_name=WORKFLOW_NAME,
-        execution_mode="manual_plate",
+        execution_mode=execution_mode,
         output_dir=output_dir,
         protocol_csv=protocol_path,
         source_plate_csv=source_plate_path,

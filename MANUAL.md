@@ -4,7 +4,7 @@
 
 **Echo Protocol** generates liquid handler transfer instructions for Beckman Echo instruments. You can:
 - Configure experiments via a web UI
-- Choose between using a premade source plate or creating a new one from scratch
+- Choose between using a premade source plate or defining a new one manually
 - Download validated CSV protocols ready for the liquid handler
 
 No coding required.
@@ -39,17 +39,22 @@ Select "Use a premade plate" in the web UI. This replays historical protocols fr
 - `data/raw/20240813_ML_L1_source_plateA.csv` → corresponding echo protocol
 - `data/raw/20240813_ML_L1_source_plateB.csv` → corresponding echo protocol
 
+The app also derives initial parameter values from the selected premade source plate and historical
+protocol so you can quickly regenerate a similar run. This parameter inference is still a product
+assumption and should be validated with real end users before being treated as final workflow logic.
+
 Best for: Reproducing established experiments.
 
-### 2. Creating a New Plate from Scratch
+### 2. Defining a New Plate Manually
 
-Select "Create a new plate from scratch." This runs the preprocessing notebook which:
-1. Allocates sample wells in the first half of a 384-well plate
-2. Allocates antigen/PBS reagent wells in the second half
-3. Generates destination transfers with serial dilutions
-4. Outputs Echo protocol CSV
+Select "Create a New Plate" in the web UI, then fill the 384-well editor with entries like
+`sample1: 60000`. You can also apply the suggested layout to prefill the grid from the current
+experiment settings. The app then:
+1. Saves your manual source plate layout
+2. Builds a protocol CSV from matching sample, antigen, and PBS wells
+3. Writes a destination-composition CSV for review alongside the protocol output
 
-Best for: New experiments with fresh sample libraries.
+Best for: New experiments with custom source layouts.
 
 ---
 
@@ -79,6 +84,12 @@ After a successful run, you'll find in `generated/<experiment_name>/`:
 | `<name>_source_plate.csv` | Source plate layout |
 | `<name>_destination_composition.csv` | What's in each destination well |
 | `<name>_run_manifest.json` | Run parameters and metadata |
+
+The web UI now also gives you:
+- a completion message with timestamp and runtime
+- a review panel with the generated source plate and the actual generated protocol table
+- a collapsible destination-composition view
+- clearer download cards with short file descriptions
 
 The Echo protocol CSV has these columns:
 - `Sample Name`
@@ -132,9 +143,9 @@ Two different samples are being transferred to the same destination well. Check 
 
 ### Notebook Execution Fails
 
-1. Check that `papermill` is installed: `pip install papermill`
-2. Verify the notebook path is correct
-3. Check the output directory is writable
+1. Check that the notebook path is correct if you configured `ECHO_WORKFLOW_NOTEBOOK`
+2. Check that the output directory is writable
+3. In constrained environments, the app will fall back to an in-process notebook executor automatically
 
 ### Output CSV Missing
 
@@ -186,7 +197,9 @@ cat generated/<name>_<experiment_name>_echo_protocol.csv
 UI Input → PreprocessingRequest
     ↓
 If "premade plate": load fixture CSV pair
-If "new plate": execute notebook (via papermill)
+    derive initial parameter values from the selected source plate + historical protocol
+If "manual plate": run the built-in Python workflow
+If "notebook workflow": use papermill or fall back to in-process execution
     ↓
 Source plate + Echo protocol CSV generated
     ↓

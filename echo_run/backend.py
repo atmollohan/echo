@@ -397,6 +397,100 @@ def build_echo_protocol_summary(protocol_df):
     }
 
 
+def build_source_plate_remaining_summary(plate_map, protocol_df):
+    """Summarize what volume remains in each loaded source well after transfers."""
+    import pandas as pd
+
+    loaded_wells: dict[str, dict[str, int | str]] = {}
+    for row_label, row in plate_map.iterrows():
+        for column_label, cell_value in row.items():
+            substance, loaded_volume = parse_plate_entry(cell_value)
+            if not substance or loaded_volume is None:
+                continue
+            well = f"{row_label}{column_label}"
+            loaded_wells[well] = {
+                "substance": substance,
+                "loaded_volume_nl": loaded_volume,
+            }
+
+    transferred_by_well = (
+        protocol_df.groupby("Source Well")["Transfer Volume"].sum().to_dict()
+        if not protocol_df.empty and "Source Well" in protocol_df.columns
+        else {}
+    )
+
+    well_rows: list[dict[str, object]] = []
+    substance_rows: dict[str, dict[str, int]] = defaultdict(
+        lambda: {
+            "loaded_volume_nl": 0,
+            "transferred_volume_nl": 0,
+            "remaining_volume_nl": 0,
+            "well_count": 0,
+            "reusable_wells": 0,
+        }
+    )
+
+    total_loaded = 0
+    total_transferred = 0
+    total_remaining = 0
+    reusable_wells = 0
+
+    for well in sorted(loaded_wells, key=lambda item: (item[0], int(item[1:]))):
+        substance = str(loaded_wells[well]["substance"])
+        loaded_volume = int(loaded_wells[well]["loaded_volume_nl"])
+        transferred_volume = int(transferred_by_well.get(well, 0))
+        remaining_volume = max(loaded_volume - transferred_volume, 0)
+
+        well_rows.append(
+            {
+                "Source Well": well,
+                "Substance": substance,
+                "Loaded Volume (nL)": loaded_volume,
+                "Transferred Volume (nL)": transferred_volume,
+                "Remaining Volume (nL)": remaining_volume,
+            }
+        )
+
+        stats = substance_rows[substance]
+        stats["loaded_volume_nl"] += loaded_volume
+        stats["transferred_volume_nl"] += transferred_volume
+        stats["remaining_volume_nl"] += remaining_volume
+        stats["well_count"] += 1
+        if remaining_volume > 0:
+            stats["reusable_wells"] += 1
+
+        total_loaded += loaded_volume
+        total_transferred += transferred_volume
+        total_remaining += remaining_volume
+        if remaining_volume > 0:
+            reusable_wells += 1
+
+    summary_table = pd.DataFrame(
+        [
+            {
+                "Substance": substance,
+                "Wells": stats["well_count"],
+                "Reusable Wells": stats["reusable_wells"],
+                "Loaded Volume (nL)": stats["loaded_volume_nl"],
+                "Transferred Volume (nL)": stats["transferred_volume_nl"],
+                "Remaining Volume (nL)": stats["remaining_volume_nl"],
+            }
+            for substance, stats in sorted(substance_rows.items())
+        ]
+    )
+
+    wells_table = pd.DataFrame(well_rows)
+    return {
+        "total_loaded_volume_nl": total_loaded,
+        "total_transferred_volume_nl": total_transferred,
+        "total_remaining_volume_nl": total_remaining,
+        "loaded_well_count": len(loaded_wells),
+        "reusable_well_count": reusable_wells,
+        "summary_table": summary_table,
+        "wells_table": wells_table,
+    }
+
+
 def streamlit_is_available() -> bool:
     """Check whether the runtime dependency needed for the UI is importable."""
     try:

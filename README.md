@@ -98,18 +98,19 @@ Then open http://localhost:8501 in your browser.
 1. **Open the web interface** in your browser
 2. **Choose the plate starting point**:
    - `Use a premade plate`, OR
-   - `Create a new plate from scratch`
+   - `Create a new plate`
 3. **Fill out the experiment parameters** in the form
+   - When using a premade plate, the app now derives initial parameter values from the selected source plate and historical protocol
 4. **Inspect the sample source plate maps** to see how the current repo arranges materials in the committed CSV examples
 5. **Inspect the committed Echo protocol maps** to see how those source materials turn into destination transfers
 6. **Click "Generate Protocol"** to test the current UI flow
-7. Review the status message describing what is already wired up and what is still pending
+7. Review the generated source plate and protocol previews, then download the CSV artifacts
 
 The app is now intentionally centered on one workflow:
 
 - a single preprocessing notebook conceptually called `echo-protocol-preprocessing`
 - form-based setup instead of notebook switching or config upload
-- an explicit branch for `premade plate` versus `create a new plate`
+- an explicit branch for `premade plate` versus `manual source plate definition`
 - a generic Python preprocessing runner that can accept form fields directly and later hand them to a parameterized notebook or Python implementation
 
 ## Configuration
@@ -156,10 +157,17 @@ strongest evidence of prior successful runs. Those raw files include:
 
 When a scientist selects a premade reference case, the UI renders that source plate together with
 the paired historical protocol output so the workflow is easy to understand before running a new
-experiment.
+experiment. The current UI also derives default parameter values from that selected source
+plate/protocol pair so the scientist can quickly regenerate a similar run, though that inference
+still needs validation with end users.
 
 After a run completes, the UI renders the generated source plate and generated protocol together so
-the protocol can be validated before the CSVs are downloaded.
+the protocol can be validated before the CSVs are downloaded. The review panel now includes:
+
+- a completion banner with timestamp and runtime
+- the generated protocol table itself
+- a collapsible destination-composition view
+- clearer artifact download cards with short file descriptions
 
 ## Project Structure
 
@@ -194,14 +202,18 @@ the protocol can be validated before the CSVs are downloaded.
 ## Current Status
 
 - The Streamlit UI is now shaped around one fixed preprocessing workflow instead of notebook switching.
-- The UI now makes the main workflow decision explicit: use a premade plate or create a new one from scratch.
+- The UI now makes the main workflow decision explicit: use a premade plate or define a new source plate manually.
 - The app now pairs each selected premade source plate with its reference protocol output instead of showing every committed output up front.
+- Premade plate selection now auto-fills parameter fields from the selected source plate and historical protocol.
+- Premade plate parameter inference is still a product assumption and should be validated with end users.
 - The app now shows generated source plate and protocol validation previews only after a workflow run completes.
+- The validation view now includes the actual generated Echo protocol table before the destination-composition preview.
+- The post-run experience now includes a completion timestamp, runtime, and clearer download cards.
 - The notebook list and documentation now reflect the notebook workflows that actually exist in the repo.
 - The Run button now calls a generic preprocessing runner that accepts form fields directly.
 - Premade Plate A and Plate B runs can already be validated against the committed fixture CSVs.
-- The target user flow is now: choose plate mode, enter parameters, run `echo-protocol-preprocessing`, and produce both a protocol CSV and companion visualization CSVs.
-- Creating a new plate from scratch still needs the custom preprocessing notebook or Python implementation to be connected.
+- Manual source plate runs now use a built-in Python workflow and produce a protocol CSV plus companion visualization CSVs.
+- Notebook-based preprocessing now falls back to an in-process executor when Jupyter kernel startup is unavailable in constrained environments.
 - The current notebooks appear to be self-contained and historically write CSVs directly with hardcoded names.
 - Docker and local editable installs now use the same package entry point: `echo-protocol-generate`.
 - On Linux systems with externally managed Python, use a virtual environment before running `pip install -e .`.
@@ -223,7 +235,7 @@ These are better questions to ask as you shape this into a useful product for gr
 other lab users, not just a thin wrapper around notebooks:
 
 1. If the user chooses a premade plate, what information do they need to specify besides the plate itself: experiment type, sample list, concentrations, replicate pattern, or destination layout?
-2. If the user chooses to create a new plate from scratch, what are the minimum inputs required to build that plate correctly without opening the notebook?
+2. If the user defines a new plate manually, what are the minimum inputs required to build that plate correctly without opening a notebook?
 3. Before the user clicks Run, what exact previews or checks would make them confident enough to trust the preprocessing step?
 4. Which errors or warnings would be most valuable to catch automatically before a grad student sends the protocol to the robot?
 5. For repeated experiments, would users prefer to clone a previous run, start from a saved preset, or reuse a premade plate with just a few parameter changes?

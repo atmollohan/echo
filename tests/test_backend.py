@@ -9,6 +9,7 @@ from pathlib import Path
 from echo_run.backend import (
     DEFAULT_CONFIG,
     build_echo_protocol_summary,
+    build_source_plate_remaining_summary,
     build_sanity_report,
     build_source_plate_summary,
     get_echo_protocol_paths,
@@ -157,6 +158,41 @@ class EchoProtocolTests(unittest.TestCase):
             )
             self.assertEqual(int(summary["destination_count_grid"].loc["A", 1]), 2)
             self.assertEqual(int(summary["source_count_grid"].loc["A", 1]), 2)
+
+    def test_source_plate_remaining_summary_tracks_leftover_volume(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_csv_path = Path(temp_dir) / "example_source_plate.csv"
+            source_csv_path.write_text(
+                ",1,2\nA,S1: 1000nL,antigen: 800nL\nB,PBS: 500nL,\n",
+                encoding="utf-8",
+            )
+            protocol_csv_path = Path(temp_dir) / "example_echo_protocol.csv"
+            protocol_csv_path.write_text(
+                (
+                    "Unnamed: 0,Sample Name,Source Plate Name,Source Well,Destination Well,"
+                    "Transfer Volume,Destination Plate Name,Source Plate Type\n"
+                    "0,S1,src,A1,A1,250,dest,384PP_AQ_BP\n"
+                    "1,S1,src,A2,A1,100,dest,384PP_AQ_BP\n"
+                ),
+                encoding="utf-8",
+            )
+
+            plate_map = load_source_plate_map(source_csv_path)
+            protocol_df = load_echo_protocol(protocol_csv_path)
+            summary = build_source_plate_remaining_summary(plate_map, protocol_df)
+
+            self.assertEqual(summary["total_loaded_volume_nl"], 2300)
+            self.assertEqual(summary["total_transferred_volume_nl"], 350)
+            self.assertEqual(summary["total_remaining_volume_nl"], 1950)
+            self.assertEqual(summary["reusable_well_count"], 3)
+            self.assertEqual(
+                int(
+                    summary["summary_table"]
+                    .loc[summary["summary_table"]["Substance"] == "S1", "Remaining Volume (nL)"]
+                    .iloc[0]
+                ),
+                750,
+            )
 
 
 class SourcePlateSuggestionTests(unittest.TestCase):

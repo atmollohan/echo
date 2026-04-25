@@ -199,7 +199,6 @@ UI Input → PreprocessingRequest
 If "premade plate": load fixture CSV pair
     derive initial parameter values from the selected source plate + historical protocol
 If "manual plate": run the built-in Python workflow
-If "notebook workflow": use papermill or fall back to in-process execution
     ↓
 Source plate + Echo protocol CSV generated
     ↓
@@ -214,7 +213,7 @@ Output files written to generated/<experiment_name>/
 - `echo_run/preprocessing.py` - Workflow runner
 - `echo_run/validation.py` - Protocol validation
 - `echo_run/backend.py` - Config parsing, file utilities
-- `notebooks/echo-protocol-preprocessing.ipynb` - Protocol generation notebook
+- `notebooks/` - Protocol generation notebooks (library_plate_a/b, premade_sensor_dual_antigen, dual_antigen_expression)
 
 ---
 

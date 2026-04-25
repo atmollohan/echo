@@ -32,6 +32,7 @@ No Python coding, no notebook editing, no complex setup required.
 - numpy - Numerical operations for dose calculations
 - matplotlib - Plate heatmaps, visualization
 - papermill - Notebook execution
+- jupyter - Notebook runtime
 - tqdm - Progress bars
 
 ### Runtime
@@ -82,6 +83,7 @@ No Python coding, no notebook editing, no complex setup required.
 .
 ├── app.py                    # Streamlit web UI
 ├── pyproject.toml            # Project dependencies
+├── Makefile                # Development tasks
 ├── config.example.ini        # Example configuration
 ├── Dockerfile                # Docker container
 ├── README.md                 # Usage instructions
@@ -99,13 +101,19 @@ No Python coding, no notebook editing, no complex setup required.
 ## Getting Started
 
 ### Local Development
+
 ```bash
-# Python venv
+# Create virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
+
+# Install package (editable)
 pip install -e .
 
 # Run web UI
+echo-protocol-generate
+
+# Or run Streamlit directly
 streamlit run app.py
 ```
 
@@ -119,6 +127,7 @@ streamlit run app.py
 ```
 
 ### Docker
+
 ```bash
 # Build
 docker build -t echo-protocol-generate .
@@ -151,9 +160,10 @@ notebook = library_plate_a_protocol.ipynb
 ## Notes
 
 - Units for all volumes are in nanoliters (nL)
-- Notebooks still rely heavily on hardcoded parameters and internal variant lists
-- Output format: Beckman Echo CSV (Source Well, Dest Well, Transfer Volume)
+- Output format: Beckman Echo CSV
 - `data/raw/` contains historical source plate maps and Echo protocol CSVs for the library plate workflows
+- Package dependencies are managed via `pyproject.toml` (no requirements.txt)
+- Entry point: `echo-protocol-generate` command
 
 ## Development
 

@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install -y \
 
 # Copy project files
 COPY pyproject.toml README.md ./
-COPY requirements.txt ./
 COPY app.py ./
 COPY config.example.ini ./
 COPY echo_run/ ./echo_run/

@@ -43,14 +43,13 @@ No Python coding, no notebook editing, no complex setup required.
 - Matplotlib - Plate heatmaps, dose-response curves
 ## Configuration
 - Virtual environment or Conda environment setup for local development
-- No environment variables used
-- `makefile` - Automates venv creation and dependency installation
-- `requirements.txt` - Python dependencies
+- `pyproject.toml` - Python dependencies (uses setuptools)
+- `Makefile` - Common development tasks
 - Jupyter notebooks (`.ipynb`) for all analysis code
 ## Platform Requirements
-- Python 3
+- Python 3.11+
+- Docker for containerized deployment
 - Virtual environment or Conda environment
-- Not applicable - local analysis only
 <!-- GSD:stack-end -->
 
 <!-- GSD:conventions-start source:CONVENTIONS.md -->

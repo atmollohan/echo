@@ -6,6 +6,8 @@ A user-friendly web application for generating Beckman Echo liquid handler proto
 
 ### 1. Pull the Docker Image
 
+The image is built for both **amd64** (Intel Macs, Linux x86_64) and **arm64** (Apple Silicon Macs, Raspberry Pi, ARM Linux). Docker will automatically pull the correct architecture for your machine.
+
 ```bash
 # From GitHub Container Registry (GHCR)
 docker pull ghcr.io/atmollohan/echo:latest

@@ -13,23 +13,27 @@ No programming required - just fill out a web form and download your protocol.
 
 ## Quick Start
 
-### 1. Pull the Docker Image
+### Docker (Recommended)
 
 ```bash
 docker pull ghcr.io/atmollohan/echo:latest
-```
-
-### 2. Run the App
-
-```bash
 docker run -p 8501:8501 ghcr.io/atmollohan/echo:latest
 ```
 
-### 3. Open in Browser
+### Local Development (Without Docker)
 
-Go to: **http://localhost:8501**
+If you have Python 3.11+ and Git but not Docker:
 
-You'll see the web interface with a form to configure your experiment.
+```bash
+git clone https://github.com/atmollohan/echo.git
+cd echo
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+streamlit run app.py
+```
+
+Then open **http://localhost:8501** in your browser.
 
 ---
 
@@ -121,12 +125,15 @@ docker run -p 8502:8501 ghcr.io/atmollohan/echo:latest
 
 ---
 
-## Need Help?
+## Need Help? Want to Contribute?
 
-This tool is designed for lab scientists who want to generate Echo protocols without coding. If you have questions or run into issues, open an issue on GitHub: https://github.com/atmollohan/echo/issues
+This tool is designed for lab scientists who want to generate Echo protocols without coding. If you have questions or run into issues:
+
+- **Open an issue on GitHub**: https://github.com/atmollohan/echo/issues
+- **Contribute**: We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up a development environment and submit changes.
 
 ---
 
 ## License
 
-MIT
+MIT - See the [LICENSE](LICENSE) file for details.

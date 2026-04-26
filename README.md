@@ -2,9 +2,47 @@
 
 A user-friendly web application for generating Beckman Echo liquid handler protocols. Designed for lab scientists who aren't coders: choose whether they are reusing a premade plate or creating a new one, configure experiment parameters in a form, inspect committed source plate layouts and Echo transfer plans, and prepare for CSV protocol generation without editing notebook code.
 
-## Quick Start
+## Quick Start (Pull, Configure, Run)
 
-### Option 1: Docker (Recommended)
+### 1. Pull the Docker Image
+
+```bash
+# From GitHub Container Registry (GHCR)
+docker pull ghcr.io/atmollohan/echo:latest
+
+# Or pull a specific version
+docker pull ghcr.io/atmollohan/echo:v0.1.0
+```
+
+### 2. Run the Application
+
+```bash
+# Basic run - opens web interface on port 8501
+docker run -p 8501:8501 ghcr.io/atmollohan/echo:latest
+
+# Then open http://localhost:8501 in your browser
+```
+
+### 3. Configure (Optional)
+
+Mount custom notebooks or data folders:
+
+```bash
+docker run -p 8501:8501 \
+  -v /path/to/local/notebooks:/workspace/notebooks \
+  -v /path/to/local/data:/workspace/data \
+  -e ECHO_NOTEBOOKS_DIR=/workspace/notebooks \
+  -e ECHO_DATA_DIR=/workspace/data \
+  ghcr.io/atmollohan/echo:latest
+```
+
+Environment variables:
+- `ECHO_NOTEBOOKS_DIR`: Override notebook directory (default: `/app/notebooks`)
+- `ECHO_DATA_DIR`: Override data directory (default: `/app/data`)
+
+---
+
+## Build from Source
 
 ```bash
 # Build the container
@@ -14,37 +52,11 @@ docker build -t echo-protocol-generate .
 docker run -p 8501:8501 echo-protocol-generate
 ```
 
-Then open http://localhost:8501 in your browser.
+---
 
-### Docker with Local Notebook/Data Folders
+## Local Development
 
-If your user keeps working files in a separate folder on their machine, mount those directories into
-the container and point the app at them with environment variables.
-
-Example host workspace:
-
-```text
-~/echo-work/
-├── notebooks/
-└── data/
-```
-
-Run the container with mounted folders:
-
-```bash
-docker run -p 8501:8501 \
-  -v ~/echo-work/notebooks:/workspace/notebooks \
-  -v ~/echo-work/data:/workspace/data \
-  -e ECHO_NOTEBOOKS_DIR=/workspace/notebooks \
-  -e ECHO_DATA_DIR=/workspace/data \
-  echo-protocol-generate
-```
-
-This lets her copy notebooks and CSV data in and out of `~/echo-work` without rebuilding the image.
-The containerized app will read notebooks from `ECHO_NOTEBOOKS_DIR` and sample/output data from
-`ECHO_DATA_DIR`.
-
-### Option 2: Local Development with Python `venv`
+### Option 1: Python `venv`
 
 ```bash
 # Create a virtual environment
@@ -60,19 +72,37 @@ echo-protocol-generate
 # Run a backend-only sanity check
 echo-protocol-generate --check
 
-# Run the preprocessing workflow directly from the shell
-echo-protocol-generate --run-preprocessing \
-  --plate-mode "Use a premade plate" \
-  --premade-plate 20240813_ML_L1_source_plateA.csv \
-  --experiment-name plate_a_validation
-
 # Or run Streamlit directly
 streamlit run app.py
 ```
 
-If you prefer `uv`, replace the install step with `uv pip install -e .`.
+Then open http://localhost:8501 in your browser.
+
+### Option 2: Conda
+
+```bash
+# Create and activate a Conda environment
+conda create -n echo-protocol python=3.11 -y
+conda activate echo-protocol
+
+# Install dependencies
+pip install -e .
+
+# Run the web interface
+echo-protocol-generate
+```
 
 Then open http://localhost:8501 in your browser.
+
+## Docker Image Versions
+
+The Docker image is automatically built and pushed to GitHub Container Registry (GHCR) when:
+- Code is pushed to `main` branch
+- A new tag is pushed (e.g., `v0.1.0`)
+
+Tags are available at:
+- `ghcr.io/atmollohan/echo:latest` - Latest build from main
+- `ghcr.io/atmollohan/echo:v0.1.0` - Specific version
 
 ### Option 3: Local Development with Conda
 

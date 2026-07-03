@@ -106,6 +106,23 @@ docker run -p 8501:8501 \
 
 The Docker image pulls the correct architecture automatically.
 
+## Deploying on a Raspberry Pi
+
+This app runs as a Docker container on a Raspberry Pi behind a Cloudflare
+Tunnel, reachable over Tailscale for admin access.
+
+```
+User browser → Cloudflare → cloudflared (host systemd) → localhost:8501 → Echo container
+                            ▲
+                       Tailscale SSH — admin access
+```
+
+See [deploy/](deploy/) for:
+- `docker-compose.yml` — Echo app service
+- `pi-setup.md` — Step-by-step Pi setup guide
+- `cloudflare-tunnel.md` — Cloudflare Tunnel configuration
+- `setup.sh` — Idempotent one-shot setup script
+
 ---
 
 ## Troubleshooting

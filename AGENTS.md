@@ -167,6 +167,26 @@ notebook = library_plate_a_protocol.ipynb
 
 ## Development
 
+### Deployment
+
+**Target:** Raspberry Pi (arm64) behind Cloudflare Tunnel, reached via Tailscale.
+
+**CI/CD Pipeline:**
+
+| Trigger | Action |
+|---------|--------|
+| Push to `main` | Build + push multi-arch Docker image to GHCR |
+| PR merged to `main` | Build + push + create GitHub Release + deploy to Pi |
+| Manual (`workflow_dispatch`) | Deploy latest image to Pi |
+
+**Key infra files:**
+
+- `deploy/docker-compose.yml` — Echo app service
+- `deploy/pi-setup.md` — Pi setup guide
+- `deploy/cloudflare-tunnel.md` — Tunnel config
+- `.github/workflows/deploy.yml` — Pi deploy via Tailscale SSH
+- `.github/workflows/release.yml` — Versioned release + deploy
+
 ### Running Checks
 
 Before commits, always run:

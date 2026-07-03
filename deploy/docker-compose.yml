@@ -1,0 +1,24 @@
+# Echo Protocol
+#
+# Deploys the Echo protocol generator on a Raspberry Pi.
+# cloudflared runs as a host systemd service (not in Docker) and proxies
+# to localhost:8501. Tailscale provides admin SSH access.
+#
+# Usage:
+#   docker compose -f deploy/docker-compose.yml up -d
+
+services:
+  echo-protocol:
+    image: ghcr.io/atmollohan/echo:latest
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8501:8501"
+    volumes:
+      - echo-data:/app/generated
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_HEADLESS=true
+
+volumes:
+  echo-data:

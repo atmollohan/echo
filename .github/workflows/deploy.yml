@@ -1,0 +1,33 @@
+name: Deploy to Raspberry Pi
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy via SSH
+        run: |
+          tailscale ssh mollopi5@rpi-echo '
+            set -e
+            cd ~/projects/echo
+            docker compose -f deploy/docker-compose.yml pull
+            docker compose -f deploy/docker-compose.yml up -d
+            docker image prune -a -f
+            echo "Deploy complete — verifying..."
+            sleep 3
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8501
+          '

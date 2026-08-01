@@ -17,7 +17,18 @@ No programming required - just fill out a web form and download your protocol.
 
 ```bash
 docker pull ghcr.io/atmollohan/echo:latest
-docker run -p 8501:8501 ghcr.io/atmollohan/echo:latest
+
+# Run in background (detached)
+docker run -d -p 8501:8501 --name echo-protocol ghcr.io/atmollohan/echo:latest
+```
+
+Manage the running container:
+
+```bash
+docker logs -f echo-protocol    # View logs (Ctrl+C to stop following)
+docker stop echo-protocol       # Stop the container
+docker start echo-protocol      # Start it again
+docker rm echo-protocol         # Remove when done
 ```
 
 ### Local Development (Without Docker)
@@ -89,7 +100,7 @@ Review the generated plates and download:
 If you want to use your own notebooks or data:
 
 ```bash
-docker run -p 8501:8501 \
+docker run -d -p 8501:8501 --name echo-protocol \
   -v /path/to/your/notebooks:/workspace/notebooks \
   -v /path/to/your/data:/workspace/data \
   -e ECHO_NOTEBOOKS_DIR=/workspace/notebooks \
@@ -102,9 +113,9 @@ docker run -p 8501:8501 \
 ## System Requirements
 
 - Docker installed on your computer
-- Any computer (works on Intel Mac, Apple Silicon Mac, Linux, Raspberry Pi)
+- Any computer (works on Intel Mac, Apple Silicon Mac, Linux, Raspberry Pi 3+)
 
-The Docker image pulls the correct architecture automatically.
+The Docker image pulls the correct architecture automatically (amd64/arm64).
 
 ## Deploying on a Raspberry Pi
 
@@ -117,11 +128,34 @@ User browser → Cloudflare → cloudflared (host systemd) → localhost:8501 �
                        Tailscale SSH — admin access
 ```
 
-See [deploy/](deploy/) for:
+### Automatic Versioning & Deployment
+
+Images are published to `ghcr.io/atmollohan/echo` on every push to `main`.
+The Pi pulls the `latest` tag and restarts automatically via GitHub Actions.
+
+**CI/CD Pipeline** (`.github/workflows/`):
+
+| Trigger | Action |
+|---------|--------|
+| Push to `main` | Build + push multi-arch Docker image to GHCR |
+| Deploy workflow | SSH into Pi via Tailscale, pull latest image, restart |
+
+**Manual deploy** (if needed):
+
+```bash
+# On the Pi
+docker compose -f deploy/docker-compose.yml pull
+docker compose -f deploy/docker-compose.yml up -d
+```
+
+### Pi Setup
+
+See [deploy/](deploy/) for full details:
 - `docker-compose.yml` — Echo app service
 - `pi-setup.md` — Step-by-step Pi setup guide
 - `cloudflare-tunnel.md` — Cloudflare Tunnel configuration
 - `setup.sh` — Idempotent one-shot setup script
+- `ops.md` — Day-to-day operations and troubleshooting
 
 ---
 
@@ -131,13 +165,14 @@ See [deploy/](deploy/) for:
 
 ```bash
 # Use a different port
-docker run -p 8502:8501 ghcr.io/atmollohan/echo:latest
+docker run -d -p 8502:8501 --name echo-protocol ghcr.io/atmollohan/echo:latest
 ```
 
 ### Can't access localhost:8501
 
 - Make sure Docker is running
 - Check the container is running: `docker ps`
+- Check logs: `docker logs echo-protocol`
 - Try http://127.0.0.1:8501 instead
 
 ---

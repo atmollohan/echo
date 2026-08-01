@@ -31,7 +31,7 @@ User browser ──► Cloudflare Edge ──► cloudflared (host systemd) ─�
 
 ## Quick Start
 
-1. **Flash a Pi** with Raspberry Pi OS Lite (64-bit)
+1. **Flash a Pi 3+** with Raspberry Pi OS Lite (64-bit)
 2. **Run setup** on the Pi: `bash deploy/setup.sh`
 3. **Set up Tailscale**: `sudo tailscale up --ssh`
 4. **Ensure cloudflared tunnel** is configured and pointing at `localhost:8501`
@@ -43,6 +43,16 @@ User browser ──► Cloudflare Edge ──► cloudflared (host systemd) ─�
 > testing on WSL, use `streamlit run app.py` directly (no Docker needed).
 
 Users can then reach the Echo UI at `https://echo.yourdomain.com`.
+
+## Versioning
+
+Images are tagged and pushed to GHCR on every push to `main`:
+
+- `ghcr.io/atmollohan/echo:latest` — always tracks `main`
+- `ghcr.io/atmollohan/echo:<sha>` — immutable per-commit images
+
+The Pi uses the `:latest` tag with `pull_policy: always` so deploys happen
+automatically when the deploy workflow runs.
 
 ## CI/CD
 

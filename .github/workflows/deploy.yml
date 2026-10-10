@@ -16,8 +16,8 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   PI_HOSTNAME: rpi3
-  PI_USER: mollopi5
-  APP_DIR: /home/mollopi5/projects/echo
+  PI_USER: atmollo
+  APP_DIR: /home/atmollo/projects/echo
 
 jobs:
   deploy:
@@ -42,7 +42,7 @@ jobs:
             set -e
             mkdir -p ${{ env.APP_DIR }}
 
-            echo 'c2VydmljZXM6CiAgZWNoby1wcm90b2NvbDoKICAgIGltYWdlOiBNQUdfUExBQ0VIT0xERVIKICAgIGNvbnRhaW5lcl9uYW1lOiBlY2hvCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgcG9ydHM6CiAgICAgIC0gIjEyNy4wLjAuMTo4NTAxOjg1MDEiCiAgICB2b2x1bWVzOgogICAgICAtIGVjaG8tZGF0YTovYXBwL2dlbmVyYXRlZAogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU1RSRUFNTElUX1NFUlZFUl9QT1JUPTg1MDEKICAgICAgLSBTVFJFQU1MSVRfU0VSVkVSX0hFQURMRVNTPXRydWUKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJweXRob24iLCAiLWMiLCAiaW1wb3J0IHVybGxpYi5yZXF1ZXN0LHN5czsgc3lzLmV4aXQoMCBpZiB1cmxsaWIucmVxdWVzdC51cmxvcGVuKCdodHRwOi8vbG9jYWxob3N0Ojg1MDEvX3N0Y29yZS9oZWFsdGgnKS5zdGF0dXMgPT0gMjAwIGVsc2UgMSkiXQogICAgICBpbnRlcnZhbDogMzBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDUKICAgICAgc3RhcnRfcGVyaW9kOiAyMHMKCnZvbHVtZXM6CiAgZWNoby1kYXRhOgo=' | base64 -d | sed 's|MAG_PLACEHOLDER|${{ steps.image.outputs.image_full }}|g' > ${{ env.APP_DIR }}/docker-compose.yml
+            echo 'IyBFY2hvIFByb3RvY29sCiMKIyBEZXBsb3lzIHRoZSBFY2hvIHByb3RvY29sIGdlbmVyYXRvciBvbiBhIFJhc3BiZXJyeSBQaSAocnBpMykuIEEgaG9zdC1sZXZlbAojIGNsb3VkZmxhcmVkIHR1bm5lbCAob25lIHBlciBkZXZpY2UsIG11bHRpcGxlIGRvbWFpbnMpIHByb3hpZXMgdGhlIEVjaG8gd2ViCiMgVUkgYXQgbG9jYWxob3N0Ojg1MDEuIFRhaWxzY2FsZSBwcm92aWRlcyBhZG1pbiBTU0ggYWNjZXNzLgojCiMgVGhlIHNhbWUgY29tcG9zZSBmaWxlIGlzIGdlbmVyYXRlZCBvbiB0aGUgUGkgYnkgdGhlIGRlcGxveSB3b3JrZmxvd3MKIyAoLmdpdGh1Yi93b3JrZmxvd3MvZGVwbG95LnltbCwgcmVsZWFzZS55bWwpLCBzbyBrZWVwIHRoZW0gaW4gc3luYy4KCnNlcnZpY2VzOgogIGVjaG8tcHJvdG9jb2w6CiAgICBpbWFnZTogTUFHX1BMQUNFSE9MREVSCiAgICBjb250YWluZXJfbmFtZTogZWNobwogICAgcmVzdGFydDogdW5sZXNzLXN0b3BwZWQKICAgIHBvcnRzOgogICAgICAtICIxMjcuMC4wLjE6ODUwMTo4NTAxIgogICAgdm9sdW1lczoKICAgICAgLSBlY2hvLWRhdGE6L2FwcC9nZW5lcmF0ZWQKICAgIGVudmlyb25tZW50OgogICAgICAtIFNUUkVBTUxJVF9TRVJWRVJfUE9SVD04NTAxCiAgICAgIC0gU1RSRUFNTElUX1NFUlZFUl9IRUFETEVTUz10cnVlCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogWyJDTUQiLCAicHl0aG9uIiwgIi1jIiwgImltcG9ydCB1cmxsaWIucmVxdWVzdCxzeXM7IHN5cy5leGl0KDAgaWYgdXJsbGliLnJlcXVlc3QudXJsb3BlbignaHR0cDovL2xvY2FsaG9zdDo4NTAxL19zdGNvcmUvaGVhbHRoJykuc3RhdHVzID09IDIwMCBlbHNlIDEpIl0KICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiA1CiAgICAgIHN0YXJ0X3BlcmlvZDogMjBzCgp2b2x1bWVzOgogIGVjaG8tZGF0YTo=' | base64 -d | sed 's|MAG_PLACEHOLDER|${{ steps.image.outputs.image_full }}|g' > ${{ env.APP_DIR }}/docker-compose.yml
 
             if [ -n '${{ secrets.GHCR_PAT }}' ]; then echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin; fi
             docker compose -f ${{ env.APP_DIR }}/docker-compose.yml pull

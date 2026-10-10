@@ -119,8 +119,9 @@ The Docker image pulls the correct architecture automatically (amd64/arm64).
 
 ## Deploying on a Raspberry Pi
 
-Echo runs on **rpi3** (alongside the games server) as a Docker container with a
-Cloudflare Tunnel sidecar, reachable over Tailscale for admin access.
+Echo runs on **rpi3** (alongside the games server) as a Docker container, served
+publicly by the rpi3 host Cloudflare tunnel, reachable over Tailscale for admin
+access.
 
 ```
 User browser → Cloudflare → cloudflared (host) → localhost:8501 → Echo container
@@ -137,9 +138,9 @@ GitHub Actions deploys to rpi3 via Tailscale SSH.
 
 | Trigger | Action |
 |---------|--------|
-| Push to `main` | Build + push multi-arch Docker image to GHCR |
-| Manual (`deploy.yml`) | SSH into rpi3 via Tailscale, pull image, restart stack |
-| PR merged to `main` (`release.yml`) | Release + build + deploy to rpi3 |
+| Push to `main` | Build + push multi-arch Docker image to GHCR **+ auto-deploy `:latest` to rpi3** (`docker.yml`) |
+| PR merged to `main` (`release.yml`) | Build + push + create GitHub Release |
+| Manual (`deploy.yml`) | Deploy a chosen image tag to rpi3 |
 
 Deployment requires the `TAILSCALE_AUTHKEY` repo secret (`GHCR_PAT` is optional
 since the image is public; the host cloudflared tunnel needs no token). See
@@ -148,9 +149,9 @@ since the image is public; the host cloudflared tunnel needs no token). See
 **Manual deploy** (if needed):
 
 ```bash
-# On the Pi
-docker compose -f deploy/docker-compose.yml pull
-docker compose -f deploy/docker-compose.yml up -d
+# On the Pi (compose lives at ~/projects/echo, written by CI or apply manually)
+docker compose -f ~/projects/echo/docker-compose.yml pull
+docker compose -f ~/projects/echo/docker-compose.yml up -d
 ```
 
 ### Pi Setup

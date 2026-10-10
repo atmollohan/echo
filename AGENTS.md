@@ -176,9 +176,9 @@ a Cloudflare Tunnel sidecar, reached via Tailscale.
 
 | Trigger | Action |
 |---------|--------|
-| Push to `main` | Build + push multi-arch Docker image to GHCR |
-| PR merged to `main` | Build + push + create GitHub Release + deploy to rpi3 |
-| Manual (`workflow_dispatch`) | Deploy latest image to rpi3 |
+| Push to `main` | Build + push multi-arch Docker image to GHCR **+ auto-deploy `:latest` to rpi3** (`docker.yml`) |
+| PR merged to `main` | Build + push + create GitHub Release (`release.yml`) |
+| Manual (`deploy.yml`) | Deploy a chosen image tag to rpi3 |
 
 Deploy uses the shared homelab pattern (`secrets.TAILSCALE_AUTHKEY` for
 Tailscale; `secrets.GHCR_PAT` optional since the image is public). Public

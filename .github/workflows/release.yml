@@ -19,9 +19,6 @@ jobs:
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
-      PI_HOSTNAME: rpi3
-      PI_USER: mollopi5
-      APP_DIR: /home/mollopi5/projects/echo
 
     steps:
       - name: Checkout code
@@ -60,46 +57,3 @@ jobs:
             ghcr.io/${{ github.repository }}:v${{ steps.semver.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
           platforms: linux/amd64,linux/arm64
-
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-
-      - name: Deploy app on Pi
-        run: |
-          tailscale ssh "${{ env.PI_USER }}@${{ env.PI_HOSTNAME }}" "
-            set -e
-            mkdir -p ${{ env.APP_DIR }}
-
-            echo 'c2VydmljZXM6CiAgZWNoby1wcm90b2NvbDoKICAgIGltYWdlOiBNQUdfUExBQ0VIT0xERVIKICAgIGNvbnRhaW5lcl9uYW1lOiBlY2hvCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgcG9ydHM6CiAgICAgIC0gIjEyNy4wLjAuMTo4NTAxOjg1MDEiCiAgICB2b2x1bWVzOgogICAgICAtIGVjaG8tZGF0YTovYXBwL2dlbmVyYXRlZAogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU1RSRUFNTElUX1NFUlZFUl9QT1JUPTg1MDEKICAgICAgLSBTVFJFQU1MSVRfU0VSVkVSX0hFQURMRVNTPXRydWUKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJweXRob24iLCAiLWMiLCAiaW1wb3J0IHVybGxpYi5yZXF1ZXN0LHN5czsgc3lzLmV4aXQoMCBpZiB1cmxsaWIucmVxdWVzdC51cmxvcGVuKCdodHRwOi8vbG9jYWxob3N0Ojg1MDEvX3N0Y29yZS9oZWFsdGgnKS5zdGF0dXMgPT0gMjAwIGVsc2UgMSkiXQogICAgICBpbnRlcnZhbDogMzBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDUKICAgICAgc3RhcnRfcGVyaW9kOiAyMHMKCnZvbHVtZXM6CiAgZWNoby1kYXRhOgo=' | base64 -d | sed 's|MAG_PLACEHOLDER|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest|g' > ${{ env.APP_DIR }}/docker-compose.yml
-
-            if [ -n '${{ secrets.GHCR_PAT }}' ]; then echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin; fi
-            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml pull
-            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml up -d
-            echo 'Verifying container...'
-            docker ps --filter name=echo --format '{{.Status}}'
-          "
-          echo "Deploy complete"
-
-      - name: Verify health
-        run: |
-          sleep 15
-          tailscale ssh "${{ env.PI_USER }}@${{ env.PI_HOSTNAME }}" "
-            CONTAINER=echo
-            status=\$(docker inspect -f '{{.State.Status}}' \$CONTAINER 2>/dev/null)
-            restart_count=\$(docker inspect -f '{{.RestartCount}}' \$CONTAINER 2>/dev/null)
-            echo \"Container status: \$status\"
-            echo \"Restart count: \$restart_count\"
-            if [ \"\$status\" != \"running\" ]; then
-              echo 'ERROR: Container is not running'
-              docker logs \$CONTAINER --tail 20
-              exit 1
-            fi
-            if [ \"\$restart_count\" -gt 3 ]; then
-              echo 'ERROR: Container in restart loop'
-              docker logs \$CONTAINER --tail 20
-              exit 1
-            fi
-            echo 'App is healthy'
-          "

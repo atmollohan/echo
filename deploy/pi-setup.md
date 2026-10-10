@@ -34,7 +34,7 @@ server, using the same pattern as the other homelab apps.
 3. Boot the Pi and SSH in:
 
 ```bash
-ssh mollopi5@rpi3.local
+ssh atmollo@rpi3.local
 ```
 
 ## Step 2 — Base Packages
@@ -72,7 +72,7 @@ tailscale ip -4           # get Tailscale IP
 Your Pi is now reachable from any device on your Tailnet via:
 
 ```bash
-ssh mollopi5@rpi3     # or use the Tailscale IP
+ssh atmollo@rpi3     # or use the Tailscale IP
 ```
 
 No ports need to be opened in your router.

@@ -49,3 +49,64 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-rpi3:
+    if: github.event_name == 'push' && github.ref_type == 'branch'
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+      PI_HOSTNAME: rpi3
+      PI_USER: atmollo
+      APP_DIR: /home/atmollo/projects/echo
+
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy app on Pi
+        run: |
+          tailscale ssh "${{ env.PI_USER }}@${{ env.PI_HOSTNAME }}" "
+            set -e
+            mkdir -p ${{ env.APP_DIR }}
+
+            echo 'IyBFY2hvIFByb3RvY29sCiMKIyBEZXBsb3lzIHRoZSBFY2hvIHByb3RvY29sIGdlbmVyYXRvciBvbiBhIFJhc3BiZXJyeSBQaSAocnBpMykuIEEgaG9zdC1sZXZlbAojIGNsb3VkZmxhcmVkIHR1bm5lbCAob25lIHBlciBkZXZpY2UsIG11bHRpcGxlIGRvbWFpbnMpIHByb3hpZXMgdGhlIEVjaG8gd2ViCiMgVUkgYXQgbG9jYWxob3N0Ojg1MDEuIFRhaWxzY2FsZSBwcm92aWRlcyBhZG1pbiBTU0ggYWNjZXNzLgojCiMgVGhlIHNhbWUgY29tcG9zZSBmaWxlIGlzIGdlbmVyYXRlZCBvbiB0aGUgUGkgYnkgdGhlIGRlcGxveSB3b3JrZmxvd3MKIyAoLmdpdGh1Yi93b3JrZmxvd3MvZGVwbG95LnltbCwgcmVsZWFzZS55bWwpLCBzbyBrZWVwIHRoZW0gaW4gc3luYy4KCnNlcnZpY2VzOgogIGVjaG8tcHJvdG9jb2w6CiAgICBpbWFnZTogTUFHX1BMQUNFSE9MREVSCiAgICBjb250YWluZXJfbmFtZTogZWNobwogICAgcmVzdGFydDogdW5sZXNzLXN0b3BwZWQKICAgIHBvcnRzOgogICAgICAtICIxMjcuMC4wLjE6ODUwMTo4NTAxIgogICAgdm9sdW1lczoKICAgICAgLSBlY2hvLWRhdGE6L2FwcC9nZW5lcmF0ZWQKICAgIGVudmlyb25tZW50OgogICAgICAtIFNUUkVBTUxJVF9TRVJWRVJfUE9SVD04NTAxCiAgICAgIC0gU1RSRUFNTElUX1NFUlZFUl9IRUFETEVTUz10cnVlCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogWyJDTUQiLCAicHl0aG9uIiwgIi1jIiwgImltcG9ydCB1cmxsaWIucmVxdWVzdCxzeXM7IHN5cy5leGl0KDAgaWYgdXJsbGliLnJlcXVlc3QudXJsb3BlbignaHR0cDovL2xvY2FsaG9zdDo4NTAxL19zdGNvcmUvaGVhbHRoJykuc3RhdHVzID09IDIwMCBlbHNlIDEpIl0KICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiA1CiAgICAgIHN0YXJ0X3BlcmlvZDogMjBzCgp2b2x1bWVzOgogIGVjaG8tZGF0YTo=' | base64 -d | sed 's|MAG_PLACEHOLDER|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest|g' > ${{ env.APP_DIR }}/docker-compose.yml
+
+            if [ -n '${{ secrets.GHCR_PAT }}' ]; then echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin; fi
+            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml pull
+            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml up -d
+            echo 'Verifying container...'
+            docker ps --filter name=echo --format '{{.Status}}'
+          "
+          echo "Deploy complete"
+
+      - name: Verify health
+        run: |
+          sleep 15
+          tailscale ssh "${{ env.PI_USER }}@${{ env.PI_HOSTNAME }}" "
+            CONTAINER=echo
+            status=\$(docker inspect -f '{{.State.Status}}' \$CONTAINER 2>/dev/null)
+            restart_count=\$(docker inspect -f '{{.RestartCount}}' \$CONTAINER 2>/dev/null)
+            echo \"Container status: \$status\"
+            echo \"Restart count: \$restart_count\"
+            if [ \"\$status\" != \"running\" ]; then
+              echo 'ERROR: Container is not running'
+              docker logs \$CONTAINER --tail 20
+              exit 1
+            fi
+            if [ \"\$restart_count\" -gt 3 ]; then
+              echo 'ERROR: Container in restart loop'
+              docker logs \$CONTAINER --tail 20
+              exit 1
+            fi
+            echo 'App is healthy'
+          "
+
+      - name: Deployment summary
+        run: |
+          echo "=== Deployment Complete ==="
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "Target: ${{ env.PI_HOSTNAME }}"

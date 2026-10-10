@@ -123,7 +123,7 @@ Echo runs on **rpi3** (alongside the games server) as a Docker container with a
 Cloudflare Tunnel sidecar, reachable over Tailscale for admin access.
 
 ```
-User browser → Cloudflare → cloudflared (sidecar) → echo-protocol:8501 → Echo container
+User browser → Cloudflare → cloudflared (host) → localhost:8501 → Echo container
                             ▲
                        Tailscale SSH — admin access
 ```
@@ -141,8 +141,9 @@ GitHub Actions deploys to rpi3 via Tailscale SSH.
 | Manual (`deploy.yml`) | SSH into rpi3 via Tailscale, pull image, restart stack |
 | PR merged to `main` (`release.yml`) | Release + build + deploy to rpi3 |
 
-Deployment requires these repo secrets: `TAILSCALE_AUTHKEY`, `GHCR_PAT`,
-`TUNNEL_TOKEN`. See [deploy/GAPS.md](deploy/GAPS.md) for known gaps.
+Deployment requires the `TAILSCALE_AUTHKEY` repo secret (`GHCR_PAT` is optional
+since the image is public; the host cloudflared tunnel needs no token). See
+[deploy/GAPS.md](deploy/GAPS.md) for known gaps.
 
 **Manual deploy** (if needed):
 
@@ -155,9 +156,9 @@ docker compose -f deploy/docker-compose.yml up -d
 ### Pi Setup
 
 See [deploy/](deploy/) for full details:
-- `docker-compose.yml` — Echo app + Cloudflare Tunnel sidecar
+- `docker-compose.yml` — Echo app service (binds 127.0.0.1:8501 for the host tunnel)
 - `pi-setup.md` — Step-by-step Pi setup guide
-- `cloudflare-tunnel.md` — Cloudflare Tunnel configuration
+- `cloudflare-tunnel.md` — Cloudflare Tunnel configuration (host-level, one per device)
 - `setup.sh` — Idempotent one-shot setup script
 - `ops.md` — Day-to-day operations and troubleshooting
 - `GAPS.md` — Known gaps / outstanding deployment tasks

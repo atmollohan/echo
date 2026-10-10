@@ -42,13 +42,11 @@ jobs:
             set -e
             mkdir -p ${{ env.APP_DIR }}
 
-            echo 'TUNNEL_TOKEN=${{ secrets.TUNNEL_TOKEN }}' > ${{ env.APP_DIR }}/.env
-
-            echo 'c2VydmljZXM6CiAgZWNoby1wcm90b2NvbDoKICAgIGltYWdlOiBNQUdfUExBQ0VIT0xERVIKICAgIGNvbnRhaW5lcl9uYW1lOiBlY2hvCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgcG9ydHM6CiAgICAgIC0gIjg1MDE6ODUwMSIKICAgIHZvbHVtZXM6CiAgICAgIC0gZWNoby1kYXRhOi9hcHAvZ2VuZXJhdGVkCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTVFJFQU1MSVRfU0VSVkVSX1BPUlQ9ODUwMQogICAgICAtIFNUUkVBTUxJVF9TRVJWRVJfSEVBRExFU1M9dHJ1ZQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6IFsiQ01EIiwgInB5dGhvbiIsICItYyIsICJpbXBvcnQgdXJsbGliLnJlcXVlc3Qsc3lzOyBzeXMuZXhpdCgwIGlmIHVybGxpYi5yZXF1ZXN0LnVybG9wZW4oJ2h0dHA6Ly9sb2NhbGhvc3Q6ODUwMS9fc3Rjb3JlL2hlYWx0aCcpLnN0YXR1cyA9PSAyMDAgZWxzZSAxKSJdCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogNQogICAgICBzdGFydF9wZXJpb2Q6IDIwcwogICAgbmV0d29ya3M6CiAgICAgIC0gZWNoby1uZXQKCiAgdHVubmVsOgogICAgaW1hZ2U6IGNsb3VkZmxhcmUvY2xvdWRmbGFyZWQ6bGF0ZXN0CiAgICBjb250YWluZXJfbmFtZTogZWNoby10dW5uZWwKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBjb21tYW5kOiB0dW5uZWwgLS1uby1hdXRvdXBkYXRlIHJ1bgogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gVFVOTkVMX1RPS0VOPSR7VFVOTkVMX1RPS0VOfQogICAgbmV0d29ya3M6CiAgICAgIC0gZWNoby1uZXQKCm5ldHdvcmtzOgogIGVjaG8tbmV0OgogICAgZHJpdmVyOiBicmlkZ2UKCnZvbHVtZXM6CiAgZWNoby1kYXRhOgo=' | base64 -d | sed 's|MAG_PLACEHOLDER|${{ steps.image.outputs.image_full }}|g' > ${{ env.APP_DIR }}/docker-compose.yml
+            echo 'c2VydmljZXM6CiAgZWNoby1wcm90b2NvbDoKICAgIGltYWdlOiBNQUdfUExBQ0VIT0xERVIKICAgIGNvbnRhaW5lcl9uYW1lOiBlY2hvCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgcG9ydHM6CiAgICAgIC0gIjEyNy4wLjAuMTo4NTAxOjg1MDEiCiAgICB2b2x1bWVzOgogICAgICAtIGVjaG8tZGF0YTovYXBwL2dlbmVyYXRlZAogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU1RSRUFNTElUX1NFUlZFUl9QT1JUPTg1MDEKICAgICAgLSBTVFJFQU1MSVRfU0VSVkVSX0hFQURMRVNTPXRydWUKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJweXRob24iLCAiLWMiLCAiaW1wb3J0IHVybGxpYi5yZXF1ZXN0LHN5czsgc3lzLmV4aXQoMCBpZiB1cmxsaWIucmVxdWVzdC51cmxvcGVuKCdodHRwOi8vbG9jYWxob3N0Ojg1MDEvX3N0Y29yZS9oZWFsdGgnKS5zdGF0dXMgPT0gMjAwIGVsc2UgMSkiXQogICAgICBpbnRlcnZhbDogMzBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDUKICAgICAgc3RhcnRfcGVyaW9kOiAyMHMKCnZvbHVtZXM6CiAgZWNoby1kYXRhOgo=' | base64 -d | sed 's|MAG_PLACEHOLDER|${{ steps.image.outputs.image_full }}|g' > ${{ env.APP_DIR }}/docker-compose.yml
 
             if [ -n '${{ secrets.GHCR_PAT }}' ]; then echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin; fi
-            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml --env-file ${{ env.APP_DIR }}/.env pull
-            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml --env-file ${{ env.APP_DIR }}/.env up -d
+            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml pull
+            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml up -d
             echo 'Verifying container...'
             docker ps --filter name=echo --format '{{.Status}}'
           "

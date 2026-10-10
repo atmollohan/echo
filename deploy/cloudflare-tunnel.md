@@ -1,40 +1,45 @@
 # Cloudflare Tunnel — Echo Protocol
 
-On rpi3, cloudflared runs as a **sidecar container** in the Echo compose stack
-(not a host systemd service). It authenticates with a tunnel token and proxies
-the Echo web UI over the compose network.
+On rpi3, cloudflared runs as a **host service** (one tunnel per device,
+multiple domains each). `echo.mollo.tech` is added as another ingress on the
+existing rpi3 tunnel and proxies to the Echo container at `localhost:8501`.
 
-## Setup
+> Since Echo's deploy uses the host tunnel, no `TUNNEL_TOKEN` secret is needed.
+> The tunnel config file and credentials live on the Pi itself.
 
-1. In the Cloudflare Zero Trust dashboard, go to **Networks → Tunnels** and
-   **Create a tunnel** (Cloudflared connector).
-2. Copy the generated tunnel token.
-3. Add a **public hostname** to the tunnel:
-   - Subdomain: `echo`
-   - Domain: `mollo.tech`
-   - Type: `HTTP`
-   - URL: `http://echo-protocol:8501`
+## Add `echo.mollo.tech` to the rpi3 tunnel
 
-   > Use the compose **service name** (`echo-protocol`), not `localhost`.
-   > cloudflared runs in its own container, so `localhost` would resolve to the
-   > tunnel container itself, not the Echo app.
-
-4. Store the token:
-   - **CI:** set repo secret `TUNNEL_TOKEN` (used by `deploy.yml` / `release.yml`)
-   - **Manual:** write `TUNNEL_TOKEN=<token>` to `deploy/.env`
-
-## Verify
-
-Locally on the Pi:
+On the Pi:
 
 ```bash
-docker ps --filter name=echo-tunnel --format '{{.Status}}'
-docker logs echo-tunnel --tail 20
+# 1. Route the hostname to the existing rpi3 tunnel (only needed if the DNS
+#    route isn't already created — the dashboard can do this too)
+cloudflared tunnel route dns <rpi3-tunnel-name> echo.mollo.tech
+
+# 2. Add an ingress rule to the config file (path varies by setup —
+#    e.g. ~/.cloudflared/config.yml or /etc/cloudflared/config.yml).
+#    Insert BEFORE the catch-all entry:
+#
+#    ingress:
+#      - hostname: echo.mollo.tech
+#        service: http://localhost:8501
+#      - hostname: <other-app>.mollo.tech
+#        service: http://localhost:<port>
+#      - service: http_status:404
+
+# 3. Validate and restart
+cloudflared tunnel ingress validate
+sudo systemctl restart cloudflared
 ```
 
-From anywhere:
+### Verify
 
 ```bash
+# Tunnel process running
+sudo systemctl status cloudflared
+cloudflared tunnel list
+
+# From anywhere
 curl -s -o /dev/null -w "%{http_code}" https://echo.mollo.tech
 # Should print 200
 ```
@@ -48,16 +53,13 @@ Restrict access behind Cloudflare's authentication:
 3. Choose a policy (e.g. email-based, one-time PIN)
 4. Users authenticate before reaching the Echo UI
 
-## Legacy note
+## Why not a sidecar tunnel?
 
-Earlier deployments used a host-level `cloudflared` systemd service with
-`/etc/cloudflared/config.yml`. That is **no longer the pattern** — Echo now uses
-the sidecar token approach shared with the games server. If a host service still
-exists on rpi3, disable it to avoid two connectors for the same tunnel:
-
-```bash
-sudo systemctl disable --now cloudflared
-```
+Earlier iterations of this repo considered a cloudflared sidecar container with
+its own tunnel (`echo-tunnel`). That created a second tunnel on rpi3. The actual
+homelab convention is **one tunnel per device with multiple domains**, so the
+sidecar was removed — Echo uses the host tunnel instead and publishes
+`127.0.0.1:8501` for it.
 
 ## Resources
 

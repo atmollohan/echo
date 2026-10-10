@@ -85,19 +85,22 @@ No ports need to be opened in your router.
 
 ## Step 4 — Cloudflare Tunnel
 
-On rpi3, cloudflared runs as a **sidecar container** in the compose stack (not a
-host systemd service). It authenticates with a tunnel token and proxies the Echo
-web UI.
+On rpi3, cloudflared runs as a **host service** — one tunnel per device with
+multiple domains. Echo reuses the existing rpi3 tunnel; no new tunnel or
+`TUNNEL_TOKEN` is needed.
 
-The tunnel token comes from `secrets.TUNNEL_TOKEN` in CI, or from
-`deploy/.env` for manual deploys:
+Add `echo.mollo.tech` as an ingress pointing at `http://localhost:8501`:
 
 ```bash
-# deploy/.env
-TUNNEL_TOKEN=<your-cloudflare-tunnel-token>
+cloudflared tunnel route dns <rpi3-tunnel-name> echo.mollo.tech
+# edit the cloudflared config (e.g. ~/.cloudflared/config.yml):
+#   - hostname: echo.mollo.tech
+#     service: http://localhost:8501
+cloudflared tunnel ingress validate
+sudo systemctl restart cloudflared
 ```
 
-See [cloudflare-tunnel.md](cloudflare-tunnel.md) for setup details.
+See [cloudflare-tunnel.md](cloudflare-tunnel.md) for details.
 
 ## Step 5 — Deploy Echo Protocol
 
@@ -105,10 +108,7 @@ See [cloudflare-tunnel.md](cloudflare-tunnel.md) for setup details.
 # Create the app directory
 mkdir -p ~/projects/echo
 
-# Write the tunnel token
-echo 'TUNNEL_TOKEN=<your-cloudflare-tunnel-token>' > ~/projects/echo/.env
-
-# Start the stack (echo app + cloudflared sidecar)
+# Start the Echo container (binds 127.0.0.1:8501 for the host tunnel)
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
@@ -120,8 +120,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8501
 # Should print 200
 ```
 
-If the tunnel's public hostname targets `http://echo-protocol:8501`, your app is
-live at the tunnel's public hostname (e.g. `https://echo.mollo.tech`).
+Once `echo.mollo.tech` routes to `localhost:8501` on the rpi3 tunnel, the app is
+live at `https://echo.mollo.tech`.
 
 ## Step 6 — Keep Running
 
@@ -135,8 +135,7 @@ docker compose -f deploy/docker-compose.yml up -d
 
 ## Security Notes
 
-- The Echo service publishes `8501:8501` — see [GAPS.md](GAPS.md) for the
-  recommendation to bind it to loopback
+- The Echo service binds to `127.0.0.1:8501` — only the host `cloudflared` reaches it
 - All public traffic goes through Cloudflare (TLS termination, DDoS protection)
 - Admin SSH goes through Tailscale (not exposed to internet)
 - No router port forwarding is required

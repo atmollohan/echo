@@ -9,9 +9,8 @@ Day-to-day operations for the Echo Protocol deployment on Raspberry Pi.
 docker compose -f deploy/docker-compose.yml ps
 docker logs -f echo
 
-# Check the cloudflared sidecar
-docker ps --filter name=echo-tunnel --format '{{.Status}}'
-docker logs echo-tunnel --tail 20
+# Check the host tunnel (one per device, multiple domains)
+sudo systemctl status cloudflared
 
 # Check resource usage
 docker stats --no-stream
@@ -66,9 +65,9 @@ docker run --rm -v echo-data:/dest -v /tmp/backup:/source \
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
 | `http://localhost:8501` returns nothing | Container not running | `docker compose up -d` |
-| Public URL returns 502 | cloudflared can't reach the app | Check `echo` container is up; check `docker logs echo-tunnel` |
+| Public URL returns 502 | cloudflared can't reach the app | Check `echo` container is up; check `sudo systemctl status cloudflared` and `sudo journalctl -u cloudflared -n 20` |
 | Public URL returns 403 | Cloudflare Access blocking | Check Access policies in Zero Trust dashboard |
-| Tunnel not connecting | Missing/invalid `TUNNEL_TOKEN`, or wrong ingress target | Check `docker logs echo-tunnel`; verify public hostname targets `http://echo-protocol:8501` |
+| Tunnel not connecting | Config or credentials issue | Check `cloudflared tunnel list` and the ingress rule for `echo.mollo.tech` (`http://localhost:8501`) |
 | Out of disk space | Old Docker images or logs | `docker image prune -a -f` and check `docker system df` |
 | Pi unresponsive via Tailscale | Tailscale daemon crashed | `sudo systemctl restart tailscaled` (needs physical access or IPMI) |
 
@@ -89,7 +88,8 @@ A deploy is triggered from GitHub Actions using Tailscale SSH:
 1. GitHub Actions connects to Tailscale via `tailscale/github-action@v4`
    (`TAILSCALE_AUTHKEY` secret)
 2. SSHs into rpi3 via `tailscale ssh`
-3. Writes `deploy/docker-compose.yml` + `.env` (from `TUNNEL_TOKEN`), logs in to
-   GHCR (`GHCR_PAT` secret), pulls the image, and reconciles the stack
+3. Writes `deploy/docker-compose.yml`, pulls the image (optionally logging in to
+   GHCR with `GHCR_PAT` — skipped since the image is public), and reconciles the
+   stack. Public traffic is served by the host cloudflared tunnel — no token.
 
 See `.github/workflows/deploy.yml` and `.github/workflows/release.yml`.

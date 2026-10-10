@@ -181,14 +181,15 @@ a Cloudflare Tunnel sidecar, reached via Tailscale.
 | Manual (`workflow_dispatch`) | Deploy latest image to rpi3 |
 
 Deploy uses the shared homelab pattern (`secrets.TAILSCALE_AUTHKEY` for
-Tailscale, `secrets.GHCR_PAT` for GHCR login, `secrets.TUNNEL_TOKEN` for the
-Cloudflare sidecar).
+Tailscale; `secrets.GHCR_PAT` optional since the image is public). Public
+traffic is served by the existing rpi3 **host** Cloudflare tunnel (one per
+device, multiple domains) — no `TUNNEL_TOKEN` needed.
 
 **Key infra files:**
 
-- `deploy/docker-compose.yml` — Echo app + Cloudflare Tunnel sidecar
+- `deploy/docker-compose.yml` — Echo app service (binds 127.0.0.1:8501)
 - `deploy/pi-setup.md` — Pi setup guide
-- `deploy/cloudflare-tunnel.md` — Tunnel config
+- `deploy/cloudflare-tunnel.md` — Host tunnel config (echo.mollo.tech ingress)
 - `deploy/GAPS.md` — Known gaps / outstanding deployment tasks
 - `.github/workflows/deploy.yml` — Manual deploy to rpi3 via Tailscale SSH
 - `.github/workflows/release.yml` — Versioned release + deploy

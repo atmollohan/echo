@@ -10,9 +10,9 @@ Legend: 🔴 blocker · 🟠 action needed · 🟡 verify · 🟢 done
 | # | Status | Gap | Notes / next step |
 |---|--------|-----|-------------------|
 | 1 | 🟠 | **Cloudflare tunnel + hostname do not exist yet** | `echo.mollo.tech` is not listed in Cloudflare. Create a tunnel + public hostname targeting `http://echo-protocol:8501`, then copy the token. See `cloudflare-tunnel.md`. |
-| 2 | 🔴 | **`GHCR_PAT` and `TUNNEL_TOKEN` secrets missing on this repo** | Verified via `gh secret list -R atmollohan/echo`: only `TAILSCALE_AUTHKEY` is set. Deploy fails at `docker login` without `GHCR_PAT`; the sidecar crash-loops without `TUNNEL_TOKEN`. Add both. |
+| 2 | 🔴 | **`TUNNEL_TOKEN` secret missing on this repo** | Verified via `gh secret list -R atmollohan/echo`: only `TAILSCALE_AUTHKEY` is set. The sidecar crash-loops without `TUNNEL_TOKEN`. Add it once the tunnel exists. (`GHCR_PAT` is **not** required — see #4.) |
 | 3 | 🟢 | **`TAILSCALE_AUTHKEY` present** | Confirmed set on `atmollohan/echo` (and games, lil-chef). `atmollohan` is a User account — secrets are per-repo, not org-wide. |
-| 4 | 🟢 | **GHCR package is private → login required** | `ghcr.io/atmollohan/echo` (and games, lil-chef) return 401 to anonymous requests, so the Pi must `docker login` with `GHCR_PAT`. Contradicts the root README claim that anyone can `docker pull` without auth — consider making the package public if that is intended. |
+| 4 | 🟢 | **GHCR package is public — no PAT needed** | `ghcr.io/atmollohan/echo` shows a Public visibility label and grants an anonymous pull token, so the Pi can pull without login. The deploy workflows now skip `docker login` when `GHCR_PAT` is unset. |
 | 5 | 🟡 | **rpi3 Tailscale node + ACL** | Deploy assumes `mollopi5@rpi3` is reachable over Tailscale and that the CI tag is allowed by the ACL. Not verifiable from WSL (tailscaled not running). Confirm with `tailscale status` on a Tailnet host. |
 | 6 | 🟡 | **Stale host cloudflared on rpi3** | Earlier design used a host systemd `cloudflared`. If it still exists, disable it to avoid two connectors for the same tunnel: `sudo systemctl disable --now cloudflared`. |
 
@@ -30,7 +30,7 @@ Legend: 🔴 blocker · 🟠 action needed · 🟡 verify · 🟢 done
 | # | Status | Gap | Notes / next step |
 |---|--------|-----|-------------------|
 | 11 | 🟠 | **`sed` delimiter bug in the games workflow** | `games/.github/workflows/deploy.yml` uses `sed 's/MAG_PLACEHOLDER/<ghcr.io/...>/g'`; the slash in the image name makes sed fail (`unknown option to 's'`). Echo avoids this with `s\|...\|...\|g`. Consider fixing upstream in `games`. |
-| 12 | 🟠 | **`GHCR_PAT` also missing on games** | `games` only has `TAILSCALE_AUTHKEY`; its workflow references `secrets.GHCR_PAT` for a private package, so its `docker login` will fail too. Worth adding there. |
+| 12 | 🟢 | **`GHCR_PAT` on games not required either** | `ghcr.io/atmollohan/games` is also public (anonymous pull token granted), so games can skip the login too. Only lil-chef is private and genuinely needs its PAT. |
 | 13 | 🟡 | **CI/CD not auto-deploy on push** | Same as the games `PLAN`/`GAPS`: push builds the image but does not auto-deploy; deploy is manual or on PR merge. Intentional for now. |
 
 ## Verification checklist (once on rpi3)

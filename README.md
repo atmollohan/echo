@@ -119,11 +119,11 @@ The Docker image pulls the correct architecture automatically (amd64/arm64).
 
 ## Deploying on a Raspberry Pi
 
-This app runs as a Docker container on a Raspberry Pi behind a Cloudflare
-Tunnel, reachable over Tailscale for admin access.
+Echo runs on **rpi3** (alongside the games server) as a Docker container with a
+Cloudflare Tunnel sidecar, reachable over Tailscale for admin access.
 
 ```
-User browser → Cloudflare → cloudflared (host systemd) → localhost:8501 → Echo container
+User browser → Cloudflare → cloudflared (sidecar) → echo-protocol:8501 → Echo container
                             ▲
                        Tailscale SSH — admin access
 ```
@@ -131,14 +131,18 @@ User browser → Cloudflare → cloudflared (host systemd) → localhost:8501 �
 ### Automatic Versioning & Deployment
 
 Images are published to `ghcr.io/atmollohan/echo` on every push to `main`.
-The Pi pulls the `latest` tag and restarts automatically via GitHub Actions.
+GitHub Actions deploys to rpi3 via Tailscale SSH.
 
 **CI/CD Pipeline** (`.github/workflows/`):
 
 | Trigger | Action |
 |---------|--------|
 | Push to `main` | Build + push multi-arch Docker image to GHCR |
-| Deploy workflow | SSH into Pi via Tailscale, pull latest image, restart |
+| Manual (`deploy.yml`) | SSH into rpi3 via Tailscale, pull image, restart stack |
+| PR merged to `main` (`release.yml`) | Release + build + deploy to rpi3 |
+
+Deployment requires these repo secrets: `TAILSCALE_AUTHKEY`, `GHCR_PAT`,
+`TUNNEL_TOKEN`. See [deploy/GAPS.md](deploy/GAPS.md) for known gaps.
 
 **Manual deploy** (if needed):
 
@@ -151,11 +155,12 @@ docker compose -f deploy/docker-compose.yml up -d
 ### Pi Setup
 
 See [deploy/](deploy/) for full details:
-- `docker-compose.yml` — Echo app service
+- `docker-compose.yml` — Echo app + Cloudflare Tunnel sidecar
 - `pi-setup.md` — Step-by-step Pi setup guide
 - `cloudflare-tunnel.md` — Cloudflare Tunnel configuration
 - `setup.sh` — Idempotent one-shot setup script
 - `ops.md` — Day-to-day operations and troubleshooting
+- `GAPS.md` — Known gaps / outstanding deployment tasks
 
 ---
 

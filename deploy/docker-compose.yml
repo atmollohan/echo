@@ -1,24 +1,52 @@
 # Echo Protocol
 #
-# Deploys the Echo protocol generator on a Raspberry Pi.
-# cloudflared runs as a host systemd service (not in Docker) and proxies
-# to localhost:8501. Tailscale provides admin SSH access.
+# Deploys the Echo protocol generator on a Raspberry Pi (rpi3) alongside the
+# games server. A Cloudflare Tunnel runs as a sidecar container and proxies
+# the Echo web UI. Tailscale provides admin SSH access.
+#
+# The tunnel token is read from a .env file in this directory:
+#   TUNNEL_TOKEN=<cloudflare tunnel token>
 #
 # Usage:
 #   docker compose -f deploy/docker-compose.yml up -d
+#
+# The same compose file is generated on the Pi by the deploy workflows
+# (.github/workflows/deploy.yml, release.yml), so keep them in sync.
 
 services:
   echo-protocol:
     image: ghcr.io/atmollohan/echo:latest
-    pull_policy: always
+    container_name: echo
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8501:8501"
+      - "8501:8501"
     volumes:
       - echo-data:/app/generated
     environment:
       - STREAMLIT_SERVER_PORT=8501
       - STREAMLIT_SERVER_HEADLESS=true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health').status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - echo-net
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: echo-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - echo-net
+
+networks:
+  echo-net:
+    driver: bridge
 
 volumes:
   echo-data:

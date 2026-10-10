@@ -8,7 +8,7 @@
 #   bash deploy/setup.sh
 #
 # This script is idempotent and public-safe (no secrets).
-# After running, set CLOUDFLARE_TUNNEL_TOKEN and start the stack.
+# After running, set TUNNEL_TOKEN and start the stack.
 
 set -euo pipefail
 
@@ -48,15 +48,16 @@ fi
 
 # ── Docker Compose ───────────────────────────────────────────────────────
 echo "Creating project directory..."
-mkdir -p ~/projects/echo/generated
+mkdir -p ~/projects/echo
 
 echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Next steps:"
 echo "  1. Authenticate Tailscale:  sudo tailscale up --ssh"
-echo "  2. Configure cloudflared:    See deploy/cloudflare-tunnel.md"
-echo "  3. Start the stack:          docker compose -f deploy/docker-compose.yml up -d"
+echo "  2. Create a tunnel:         See deploy/cloudflare-tunnel.md"
+echo "     Store its token:          echo 'TUNNEL_TOKEN=<token>' > ~/projects/echo/.env"
+echo "  3. Start the stack:         docker compose -f deploy/docker-compose.yml up -d"
 echo ""
 echo "Your app will be available at http://localhost:8501"
-echo "And publicly at https://echo.yourdomain.com (once tunnel points at :8501)"
+echo "And publicly at https://echo.mollo.tech (once the tunnel points at echo-protocol:8501)"

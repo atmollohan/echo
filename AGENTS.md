@@ -169,22 +169,28 @@ notebook = library_plate_a_protocol.ipynb
 
 ### Deployment
 
-**Target:** Raspberry Pi (arm64) behind Cloudflare Tunnel, reached via Tailscale.
+**Target:** Raspberry Pi **rpi3** (arm64), colocated with the games server, behind
+a Cloudflare Tunnel sidecar, reached via Tailscale.
 
 **CI/CD Pipeline:**
 
 | Trigger | Action |
 |---------|--------|
 | Push to `main` | Build + push multi-arch Docker image to GHCR |
-| PR merged to `main` | Build + push + create GitHub Release + deploy to Pi |
-| Manual (`workflow_dispatch`) | Deploy latest image to Pi |
+| PR merged to `main` | Build + push + create GitHub Release + deploy to rpi3 |
+| Manual (`workflow_dispatch`) | Deploy latest image to rpi3 |
+
+Deploy uses the shared homelab pattern (`secrets.TAILSCALE_AUTHKEY` for
+Tailscale, `secrets.GHCR_PAT` for GHCR login, `secrets.TUNNEL_TOKEN` for the
+Cloudflare sidecar).
 
 **Key infra files:**
 
-- `deploy/docker-compose.yml` — Echo app service
+- `deploy/docker-compose.yml` — Echo app + Cloudflare Tunnel sidecar
 - `deploy/pi-setup.md` — Pi setup guide
 - `deploy/cloudflare-tunnel.md` — Tunnel config
-- `.github/workflows/deploy.yml` — Pi deploy via Tailscale SSH
+- `deploy/GAPS.md` — Known gaps / outstanding deployment tasks
+- `.github/workflows/deploy.yml` — Manual deploy to rpi3 via Tailscale SSH
 - `.github/workflows/release.yml` — Versioned release + deploy
 
 ### Running Checks

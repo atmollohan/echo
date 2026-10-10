@@ -3,6 +3,9 @@
 Sets up a Raspberry Pi to run the Echo Protocol generator behind a Cloudflare
 Tunnel, reachable over Tailscale for admin access.
 
+Echo is deployed to **rpi3**, colocated with the [games](https://github.com/atmollohan/games)
+server, using the same pattern as the other homelab apps.
+
 > **WSL note:** These instructions target a physical Raspberry Pi running
 > Raspberry Pi OS. Docker and Tailscale do not auto-start on WSL — they
 > require manual `sudo service docker start` and `sudo tailscale up` after
@@ -23,7 +26,7 @@ Tunnel, reachable over Tailscale for admin access.
 1. Flash Raspberry Pi OS Lite (64-bit) to an SD card with the
    [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 2. In Imager settings:
-   - Set hostname (e.g. `rpi-echo`)
+   - Set hostname (e.g. `rpi3`)
    - Enable SSH **with public key only**
    - Set username/password
    - Configure Wi-Fi (if not using Ethernet)
@@ -31,7 +34,7 @@ Tunnel, reachable over Tailscale for admin access.
 3. Boot the Pi and SSH in:
 
 ```bash
-ssh mollopi5@rpi-echo.local
+ssh mollopi5@rpi3.local
 ```
 
 ## Step 2 — Base Packages
@@ -69,36 +72,43 @@ tailscale ip -4           # get Tailscale IP
 Your Pi is now reachable from any device on your Tailnet via:
 
 ```bash
-ssh mollopi5@rpi-echo     # or use the Tailscale IP
+ssh mollopi5@rpi3     # or use the Tailscale IP
 ```
 
 No ports need to be opened in your router.
 
+> **CI note:** GitHub Actions connects to this Tailnet with a reusable auth key
+> stored as the `TAILSCALE_AUTHKEY` repo secret. The Pi's `tailscaled` should be
+> tagged (e.g. `tag:prod`) and the Tailscale ACL should allow
+> `autogroup:member` → `tag:prod` and the CI tag. See the lil-chef / games repos
+> for the working configuration.
+
 ## Step 4 — Cloudflare Tunnel
 
-Cloudflare Tunnel is already running on this Pi as a host systemd service.
-It proxies the Echo web UI at `http://localhost:8501`.
+On rpi3, cloudflared runs as a **sidecar container** in the compose stack (not a
+host systemd service). It authenticates with a tunnel token and proxies the Echo
+web UI.
 
-See [cloudflare-tunnel.md](cloudflare-tunnel.md) for details on the existing
-tunnel configuration.
-
-To verify the tunnel is working:
+The tunnel token comes from `secrets.TUNNEL_TOKEN` in CI, or from
+`deploy/.env` for manual deploys:
 
 ```bash
-sudo systemctl status cloudflared
-cloudflared tunnel list
+# deploy/.env
+TUNNEL_TOKEN=<your-cloudflare-tunnel-token>
 ```
+
+See [cloudflare-tunnel.md](cloudflare-tunnel.md) for setup details.
 
 ## Step 5 — Deploy Echo Protocol
 
 ```bash
 # Create the app directory
-mkdir -p ~/projects/echo/generated
+mkdir -p ~/projects/echo
 
-# Pull the image
-docker pull ghcr.io/atmollohan/echo:latest
+# Write the tunnel token
+echo 'TUNNEL_TOKEN=<your-cloudflare-tunnel-token>' > ~/projects/echo/.env
 
-# Start the stack
+# Start the stack (echo app + cloudflared sidecar)
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
@@ -110,8 +120,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8501
 # Should print 200
 ```
 
-If the tunnel is configured to point at `localhost:8501`, your app is now
-live at the tunnel's public hostname (e.g. `https://echo.yourlab.com`).
+If the tunnel's public hostname targets `http://echo-protocol:8501`, your app is
+live at the tunnel's public hostname (e.g. `https://echo.mollo.tech`).
 
 ## Step 6 — Keep Running
 
@@ -125,7 +135,8 @@ docker compose -f deploy/docker-compose.yml up -d
 
 ## Security Notes
 
-- The Echo service binds to `127.0.0.1:8501` — not accessible from the LAN
+- The Echo service publishes `8501:8501` — see [GAPS.md](GAPS.md) for the
+  recommendation to bind it to loopback
 - All public traffic goes through Cloudflare (TLS termination, DDoS protection)
 - Admin SSH goes through Tailscale (not exposed to internet)
 - No router port forwarding is required

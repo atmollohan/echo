@@ -2,32 +2,82 @@ name: Deploy to Raspberry Pi
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+    inputs:
+      image_tag:
+        description: Image tag to deploy (defaults to latest)
+        required: false
+        type: string
+        default: latest
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PI_HOSTNAME: rpi3
+  PI_USER: mollopi5
+  APP_DIR: /home/mollopi5/projects/echo
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Set image full name
+        id: image
+        run: |
+          TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+          echo "image_full=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: Deploy via SSH
+      - name: Deploy app on Pi
         run: |
-          tailscale ssh mollopi5@rpi-echo '
+          tailscale ssh "${{ env.PI_USER }}@${{ env.PI_HOSTNAME }}" "
             set -e
-            cd ~/projects/echo
-            docker compose -f deploy/docker-compose.yml pull
-            docker compose -f deploy/docker-compose.yml up -d
-            docker image prune -a -f
-            echo "Deploy complete — verifying..."
-            sleep 3
-            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8501
-          '
+            mkdir -p ${{ env.APP_DIR }}
+
+            echo 'TUNNEL_TOKEN=${{ secrets.TUNNEL_TOKEN }}' > ${{ env.APP_DIR }}/.env
+
+            echo 'c2VydmljZXM6CiAgZWNoby1wcm90b2NvbDoKICAgIGltYWdlOiBNQUdfUExBQ0VIT0xERVIKICAgIGNvbnRhaW5lcl9uYW1lOiBlY2hvCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgcG9ydHM6CiAgICAgIC0gIjg1MDE6ODUwMSIKICAgIHZvbHVtZXM6CiAgICAgIC0gZWNoby1kYXRhOi9hcHAvZ2VuZXJhdGVkCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTVFJFQU1MSVRfU0VSVkVSX1BPUlQ9ODUwMQogICAgICAtIFNUUkVBTUxJVF9TRVJWRVJfSEVBRExFU1M9dHJ1ZQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6IFsiQ01EIiwgInB5dGhvbiIsICItYyIsICJpbXBvcnQgdXJsbGliLnJlcXVlc3Qsc3lzOyBzeXMuZXhpdCgwIGlmIHVybGxpYi5yZXF1ZXN0LnVybG9wZW4oJ2h0dHA6Ly9sb2NhbGhvc3Q6ODUwMS9fc3Rjb3JlL2hlYWx0aCcpLnN0YXR1cyA9PSAyMDAgZWxzZSAxKSJdCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogNQogICAgICBzdGFydF9wZXJpb2Q6IDIwcwogICAgbmV0d29ya3M6CiAgICAgIC0gZWNoby1uZXQKCiAgdHVubmVsOgogICAgaW1hZ2U6IGNsb3VkZmxhcmUvY2xvdWRmbGFyZWQ6bGF0ZXN0CiAgICBjb250YWluZXJfbmFtZTogZWNoby10dW5uZWwKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBjb21tYW5kOiB0dW5uZWwgLS1uby1hdXRvdXBkYXRlIHJ1bgogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gVFVOTkVMX1RPS0VOPSR7VFVOTkVMX1RPS0VOfQogICAgbmV0d29ya3M6CiAgICAgIC0gZWNoby1uZXQKCm5ldHdvcmtzOgogIGVjaG8tbmV0OgogICAgZHJpdmVyOiBicmlkZ2UKCnZvbHVtZXM6CiAgZWNoby1kYXRhOgo=' | base64 -d | sed 's|MAG_PLACEHOLDER|${{ steps.image.outputs.image_full }}|g' > ${{ env.APP_DIR }}/docker-compose.yml
+
+            echo '${{ secrets.GHCR_PAT }}' | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml --env-file ${{ env.APP_DIR }}/.env pull
+            docker compose -f ${{ env.APP_DIR }}/docker-compose.yml --env-file ${{ env.APP_DIR }}/.env up -d
+            echo 'Verifying container...'
+            docker ps --filter name=echo --format '{{.Status}}'
+          "
+          echo "Deploy complete"
+
+      - name: Verify health
+        run: |
+          sleep 15
+          tailscale ssh "${{ env.PI_USER }}@${{ env.PI_HOSTNAME }}" "
+            CONTAINER=echo
+            status=\$(docker inspect -f '{{.State.Status}}' \$CONTAINER 2>/dev/null)
+            restart_count=\$(docker inspect -f '{{.RestartCount}}' \$CONTAINER 2>/dev/null)
+            echo \"Container status: \$status\"
+            echo \"Restart count: \$restart_count\"
+            if [ \"\$status\" != \"running\" ]; then
+              echo 'ERROR: Container is not running'
+              docker logs \$CONTAINER --tail 20
+              exit 1
+            fi
+            if [ \"\$restart_count\" -gt 3 ]; then
+              echo 'ERROR: Container in restart loop'
+              docker logs \$CONTAINER --tail 20
+              exit 1
+            fi
+            echo 'App is healthy'
+          "
+
+      - name: Deployment summary
+        run: |
+          echo "=== Deployment Complete ==="
+          echo "Image: ${{ steps.image.outputs.image_full }}"
+          echo "Target: ${{ env.PI_HOSTNAME }}"
